@@ -60,6 +60,13 @@
 #define ID_DLG_AUTH_CHALLENGE            183
 #define ID_TXT_AUTH_CHALLENGE            184
 #define ID_EDT_AUTH_CHALLENGE            185
+#define ID_CHK_SAVE_PASS                 186
+#define ID_TXT_WARNING                   187
+
+/* Challenege Response Dialog */
+#define ID_DLG_CHALLENGE_RESPONSE        190
+#define ID_TXT_DESCRIPTION               191
+#define ID_EDT_RESPONSE                  192
 
 /* Proxy Settings Dialog */
 #define ID_DLG_PROXY                     200
@@ -77,12 +84,40 @@
 #define ID_DLG_GENERAL                   230
 #define ID_CMB_LANGUAGE                  231
 #define ID_TXT_LANGUAGE                  232
+#define ID_CHK_STARTUP                   233
+#define ID_CHK_SERVICE_ONLY              234
+#define ID_TXT_LOG_APPEND                235
+#define ID_CHK_LOG_APPEND                236
+#define ID_CHK_SILENT                    237
+#define ID_TXT_BALLOON                   238
+#define ID_RB_BALLOON0                   239
+#define ID_RB_BALLOON1                   240
+#define ID_RB_BALLOON2                   241
+#define ID_CHK_SHOW_SCRIPT_WIN           242
 
 /* Proxy Auth Dialog */
 #define ID_DLG_PROXY_AUTH                250
 #define ID_EDT_PROXY_USER                251
 #define ID_EDT_PROXY_PASS                252
 
+/* Advanced dialog */
+#define ID_DLG_ADVANCED                  270
+#define ID_TXT_FOLDER                    271
+#define ID_TXT_EXTENSION                 272
+#define ID_EDT_CONFIG_DIR                274
+#define ID_EDT_CONFIG_EXT                275
+#define ID_EDT_LOG_DIR                   276
+#define ID_BTN_CONFIG_DIR                277
+#define ID_BTN_LOG_DIR                   278
+#define ID_TXT_PRECONNECT_TIMEOUT        279
+#define ID_TXT_CONNECT_TIMEOUT           280
+#define ID_TXT_DISCONNECT_TIMEOUT        281
+#define ID_EDT_PRECONNECT_TIMEOUT        282
+#define ID_EDT_CONNECT_TIMEOUT           283
+#define ID_EDT_DISCONNECT_TIMEOUT        284
+
+/* Connections dialog */
+#define ID_DLG_CONNECTIONS               290
 
 /*
  * String Table Resources
@@ -113,6 +148,7 @@
 #define IDS_MENU_SERVICEONLY_RESTART    1021
 #define IDS_MENU_ASK_STOP_SERVICE       1022
 #define IDS_MENU_IMPORT                 1023
+#define IDS_MENU_CLEARPASS              1024
 
 /* LogViewer Dialog */
 #define IDS_ERR_START_LOG_VIEWER        1101
@@ -164,6 +200,10 @@
 #define IDS_ERR_CONFIG_EXIST            1251
 #define IDS_NFO_CONN_TIMEOUT            1252
 #define IDS_NFO_NO_CONFIGS              1253
+#define IDS_ERR_CONFIG_NOT_AUTHORIZED   1254
+#define IDS_ERR_CONFIG_TRY_AUTHORIZE    1255
+#define IDS_NFO_CONFIG_AUTH_PENDING     1256
+#define IDS_ERR_ADD_USER_TO_ADMIN_GROUP 1257
 
 /* Program Startup Related */
 #define IDS_ERR_OPEN_DEBUG_FILE         1301
@@ -225,7 +265,7 @@
 #define IDS_LANGUAGE_NAME               1650
 
 /* Win32 Service Related */
-#define IDS_ERR_OPEN_SCMGR_ADMIN        1701
+/* historic: #define IDS_ERR_OPEN_SCMGR_ADMIN        1701 */
 #define IDS_ERR_OPEN_VPN_SERVICE        1702
 #define IDS_ERR_START_SERVICE           1703
 #define IDS_ERR_QUERY_SERVICE           1704
@@ -258,5 +298,19 @@
 #define IDS_ERR_IMPORT_EXISTS           1901
 #define IDS_ERR_IMPORT_FAILED           1902
 #define IDS_NFO_IMPORT_SUCCESS          1903
+
+/* Save password related messages */
+#define IDS_NFO_DELETE_PASS             2001
+
+/* Token password dialog related */
+#define IDS_NFO_TOKEN_PASSWORD_CAPTION  2100
+#define IDS_NFO_TOKEN_PASSWORD_REQUEST  2101
+
+/* Password retry messages */
+#define IDS_NFO_AUTH_PASS_RETRY         2150
+#define IDS_NFO_KEY_PASS_RETRY          2151
+
+/* Timer IDs */
+#define IDT_STOP_TIMER                  2500  /* Timer used to trigger force termination */
 
 #endif

@@ -3,6 +3,7 @@
  *
  *  Copyright (C) 2004 Mathias Sundman <mathias@nilings.se>
  *                2010 Heiko Hund <heikoh@users.sf.net>
+ *                2016 Selva Nair <selva.nair@gmail.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -29,8 +30,11 @@ typedef struct connection connection_t;
 #include <windows.h>
 #include <stdio.h>
 #include <time.h>
+#include <lmcons.h>
 
 #include "manage.h"
+
+#define MAX_NAME (UNLEN + 1)
 
 /*
  * Maximum number of parameters associated with an option,
@@ -71,6 +75,23 @@ typedef enum {
     timedout
 } conn_state_t;
 
+/* Interactive Service IO parameters */
+typedef struct {
+    OVERLAPPED o; /* This has to be the first element */
+    HANDLE pipe;
+    HANDLE hEvent;
+    WCHAR readbuf[512];
+} service_io_t;
+
+#define FLAG_ALLOW_CHANGE_PASSPHRASE (1<<1)
+#define FLAG_SAVE_KEY_PASS  (1<<4)
+#define FLAG_SAVE_AUTH_PASS (1<<5)
+#define FLAG_DISABLE_SAVE_PASS (1<<6)
+
+typedef struct {
+    unsigned short major, minor, build, revision;
+} version_t;
+
 /* Connections parameters */
 struct connection {
     TCHAR config_file[MAX_PATH];    /* Name of the config file */
@@ -81,6 +102,7 @@ struct connection {
     BOOL auto_connect;              /* AutoConnect at startup id TRUE */
     conn_state_t state;             /* State the connection currently is in */
     int failed_psw_attempts;        /* # of failed attempts entering password(s) */
+    int failed_auth_attempts;       /* # of failed user-auth attempts */
     time_t connected_since;         /* Time when the connection was established */
     proxy_t proxy_type;             /* Set during querying proxy credentials */
 
@@ -92,11 +114,17 @@ struct connection {
         char *saved_data;
         size_t saved_size;
         mgmt_cmd_t *cmd_queue;
+        BOOL connected;             /* True, if management interface has connected */
     } manage;
+
+    HANDLE hProcess;                /* Handle of openvpn process if directly started */
+    service_io_t iserv;
 
     HANDLE exit_event;
     DWORD threadId;
     HWND hwndStatus;
+    int flags;
+    char *dynamic_cr;              /* Pointer to buffer for dynamic challenge string received */
 };
 
 /* All options used within OpenVPN GUI */
@@ -109,10 +137,6 @@ typedef struct {
     int num_configs;                  /* Number of configs */
 
     service_state_t service_state;    /* State of the OpenVPN Service */
-    int psw_attempts;                 /* Number of psw attemps to allow */
-    int connectscript_timeout;        /* Connect Script execution timeout (sec) */
-    int disconnectscript_timeout;     /* Disconnect Script execution timeout (sec) */
-    int preconnectscript_timeout;     /* Preconnect Script execution timeout (sec) */
 
     /* Proxy Settings */
     proxy_source_t proxy_source;      /* Where to get proxy information from */
@@ -122,29 +146,26 @@ typedef struct {
     TCHAR proxy_socks_address[100];   /* SOCKS Proxy Address */
     TCHAR proxy_socks_port[6];        /* SOCKS Proxy Address */
 
-    /* Registry values */
+    /* HKLM Registry values */
     TCHAR exe_path[MAX_PATH];
-    TCHAR config_dir[MAX_PATH];
     TCHAR global_config_dir[MAX_PATH];
+    TCHAR priority_string[64];
+    TCHAR ovpn_admin_group[MAX_NAME];
+    DWORD disable_save_passwords;
+    /* HKCU registry values */
+    TCHAR config_dir[MAX_PATH];
     TCHAR ext_string[16];
     TCHAR log_dir[MAX_PATH];
-    TCHAR priority_string[64];
-    TCHAR append_string[2];
+    DWORD log_append;
     TCHAR log_viewer[MAX_PATH];
     TCHAR editor[MAX_PATH];
-    TCHAR allow_edit[2];
-    TCHAR allow_service[2];
-    TCHAR allow_password[2];
-    TCHAR allow_proxy[2];
-    TCHAR silent_connection[2];
-    TCHAR service_only[2];
-    TCHAR show_balloon[2];
-    TCHAR show_script_window[2];
-    TCHAR psw_attempts_string[2];
-    TCHAR disconnect_on_suspend[2];
-    TCHAR connectscript_timeout_string[4];
-    TCHAR disconnectscript_timeout_string[4];
-    TCHAR preconnectscript_timeout_string[4];
+    DWORD silent_connection;
+    DWORD service_only;
+    DWORD show_balloon;
+    DWORD show_script_window;
+    DWORD connectscript_timeout;        /* Connect Script execution timeout (sec) */
+    DWORD disconnectscript_timeout;     /* Disconnect Script execution timeout (sec) */
+    DWORD preconnectscript_timeout;     /* Preconnect Script execution timeout (sec) */
 
 #ifdef DEBUG
     FILE *debug_fp;
@@ -153,10 +174,23 @@ typedef struct {
     HWND hWnd;
     HINSTANCE hInstance;
     BOOL session_locked;
+    HANDLE netcmd_semaphore;
+    version_t version;
+    char ovpn_version[16]; /* OpenVPN version string: 2.3.12, 2.4_alpha2 etc.. */
+    unsigned int dpi_scale;
+    COLORREF clr_warning;
+    COLORREF clr_error;
 } options_t;
 
 void InitOptions(options_t *);
 void ProcessCommandLine(options_t *, TCHAR *);
 int CountConnState(conn_state_t);
 connection_t* GetConnByManagement(SOCKET);
+INT_PTR CALLBACK ScriptSettingsDlgProc(HWND hwndDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK ConnectionSettingsDlgProc(HWND hwndDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK AdvancedSettingsDlgProc(HWND hwndDlg, UINT msg, WPARAM wParam, LPARAM lParam);
+void DisableSavePasswords(connection_t *);
+
+void ExpandOptions(void);
+int CompareStringExpanded(const WCHAR *str1, const WCHAR *str2);
 #endif

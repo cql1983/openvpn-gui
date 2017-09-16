@@ -40,8 +40,8 @@ extern options_t o;
 int MyStartService()
 {
 
-  SC_HANDLE schSCManager;
-  SC_HANDLE schService;
+  SC_HANDLE schSCManager = NULL;
+  SC_HANDLE schService = NULL;
   SERVICE_STATUS ssStatus; 
   DWORD dwOldCheckPoint; 
   DWORD dwStartTickCount;
@@ -145,9 +145,6 @@ int MyStartService()
         }
     } 
 
-    CloseServiceHandle(schService); 
-    CloseServiceHandle(schSCManager);
-
     if (ssStatus.dwCurrentState != SERVICE_RUNNING) 
     { 
         /* service hasn't started */
@@ -167,10 +164,15 @@ int MyStartService()
     /* Show "OpenVPN Service Started" Tray Balloon msg */
     ShowTrayBalloon(LoadLocalizedString(IDS_NFO_SERVICE_STARTED), _T(""));
 
+    CloseServiceHandle(schService);
+    CloseServiceHandle(schSCManager);
     return(true);
 
 failed:
-
+    if (schService)
+        CloseServiceHandle(schService);
+    if (schSCManager)
+        CloseServiceHandle(schSCManager);
     /* Set Service Status = Disconnecting */
     o.service_state = service_disconnected;
     SetServiceMenuStatus();
@@ -181,10 +183,11 @@ failed:
 int MyStopService()
 {
 
-  SC_HANDLE schSCManager;
-  SC_HANDLE schService;
+  SC_HANDLE schSCManager = NULL;
+  SC_HANDLE schService = NULL;
   SERVICE_STATUS ssStatus; 
   int i;
+  BOOL ret = false;
 
     // Open a handle to the SC Manager database. 
     schSCManager = OpenSCManager( 
@@ -206,7 +209,7 @@ int MyStopService()
     if (schService == NULL) {
       /* can't open vpn service */
       ShowLocalizedMsg(IDS_ERR_OPEN_VPN_SERVICE);
-      return(false);
+      goto out;
     }
 
     /* Run DisConnect script */
@@ -220,13 +223,20 @@ int MyStopService()
     {
       /* stop failed */
       ShowLocalizedMsg(IDS_ERR_STOP_SERVICE);
-      return(false);
+      goto out;
     }
 
     o.service_state = service_disconnected;
     SetServiceMenuStatus();
     CheckAndSetTrayIcon();
-    return(true);
+    ret = true;
+
+out:
+    if (schService)
+        CloseServiceHandle(schService);
+    if (schSCManager)
+        CloseServiceHandle(schSCManager);
+    return ret;
 }
 
 int MyReStartService()
@@ -242,11 +252,12 @@ int MyReStartService()
 }
 
 bool
-CheckIServiceStatus()
+CheckIServiceStatus(BOOL warn)
 {
-    SC_HANDLE schSCManager;
-    SC_HANDLE schService;
+    SC_HANDLE schSCManager = NULL;
+    SC_HANDLE schService = NULL;
     SERVICE_STATUS ssStatus;
+    BOOL ret = false;
 
     // Open a handle to the SC Manager database.
     schSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
@@ -260,28 +271,38 @@ CheckIServiceStatus()
         GetLastError() == ERROR_SERVICE_DOES_NOT_EXIST)
     {
         /* warn that iservice is not installed */
-        ShowLocalizedMsg(IDS_ERR_INSTALL_ISERVICE);
-        return(false);
+        if (warn)
+            ShowLocalizedMsg(IDS_ERR_INSTALL_ISERVICE);
+        goto out;
     }
 
     if (!QueryServiceStatus(schService, &ssStatus))
-        return(false);
+        goto out;
 
     if (ssStatus.dwCurrentState != SERVICE_RUNNING)
     {
         /* warn that iservice is not started */
-        ShowLocalizedMsg(IDS_ERR_NOTSTARTED_ISERVICE);
-        return(false);
+        if (warn)
+            ShowLocalizedMsg(IDS_ERR_NOTSTARTED_ISERVICE);
+        goto out;
     }
-    return true;
+    ret = true;
+
+out:
+    if (schService)
+        CloseServiceHandle(schService);
+    if (schSCManager)
+        CloseServiceHandle(schSCManager);
+    return ret;
 }
 
 int CheckServiceStatus()
 {
 
-  SC_HANDLE schSCManager;
-  SC_HANDLE schService;
+  SC_HANDLE schSCManager = NULL;
+  SC_HANDLE schService = NULL;
   SERVICE_STATUS ssStatus; 
+  BOOL ret = false;
 
     // Open a handle to the SC Manager database. 
     schSCManager = OpenSCManager( 
@@ -292,7 +313,7 @@ int CheckServiceStatus()
     if (NULL == schSCManager) {
       o.service_state = service_noaccess;
       SetServiceMenuStatus();
-      return(false);
+      goto out;
     }
 
     schService = OpenService( 
@@ -305,7 +326,7 @@ int CheckServiceStatus()
       ShowLocalizedMsg(IDS_ERR_OPEN_VPN_SERVICE);
       o.service_state = service_noaccess;
       SetServiceMenuStatus();
-      return(false);
+      goto out;
     }
 
     if (!QueryServiceStatus( 
@@ -314,7 +335,7 @@ int CheckServiceStatus()
     {
       /* query failed */
       ShowLocalizedMsg(IDS_ERR_QUERY_SERVICE);
-      return(false);
+      goto out;
     }
  
     if (ssStatus.dwCurrentState == SERVICE_RUNNING) 
@@ -322,13 +343,21 @@ int CheckServiceStatus()
         o.service_state = service_connected;
         SetServiceMenuStatus(); 
         SetTrayIcon(connected);
-        return(true);
+        ret = true;
+        goto out;
     }
     else 
     { 
         o.service_state = service_disconnected;
         SetServiceMenuStatus();
         SetTrayIcon(disconnected);
-        return(false);
+        goto out;
     } 
+
+out:
+    if (schService)
+        CloseServiceHandle(schService);
+    if (schSCManager)
+        CloseServiceHandle(schSCManager);
+    return ret;
 } 

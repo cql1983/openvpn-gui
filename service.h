@@ -23,4 +23,4 @@ int MyStartService();
 int MyStopService();
 int MyReStartService();
 int CheckServiceStatus();
-BOOL CheckIServiceStatus();
+BOOL CheckIServiceStatus(BOOL warn);

@@ -3,6 +3,7 @@
  *
  *  Copyright (C) 2004 Mathias Sundman <mathias@nilings.se>
  *                2010 Heiko Hund <heikoh@users.sf.net>
+ *                2016 Selva Nair <selva.nair@gmail.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -30,6 +31,9 @@
 #include "openvpn-gui-res.h"
 #include "options.h"
 #include "localization.h"
+#include "save_pass.h"
+#include "misc.h"
+#include "passphrase.h"
 
 typedef enum
 {
@@ -62,20 +66,13 @@ match(const WIN32_FIND_DATA *find, const TCHAR *ext)
 }
 
 static bool
-CheckReadAccess (const TCHAR *path)
+CheckReadAccess (const TCHAR *dir, const TCHAR *file)
 {
-    HANDLE h;
-    bool ret = FALSE;
+    TCHAR path[MAX_PATH];
 
-    h = CreateFile (path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                   FILE_ATTRIBUTE_NORMAL, NULL);
-    if ( h != INVALID_HANDLE_VALUE )
-    {
-        ret = TRUE;
-        CloseHandle (h);
-    }
+    _sntprintf_0 (path, _T("%s\\%s"), dir, file);
 
-    return ret;
+    return CheckFileAccess (path, GENERIC_READ);
 }
 
 static int
@@ -90,12 +87,13 @@ ConfigAlreadyExists(TCHAR *newconfig)
     return false;
 }
 
-
 static void
 AddConfigFileToList(int config, const TCHAR *filename, const TCHAR *config_dir)
 {
     connection_t *c = &o.conn[config];
     int i;
+
+    memset(c, 0, sizeof(*c));
 
     _tcsncpy(c->config_file, filename, _countof(c->config_file) - 1);
     _tcsncpy(c->config_dir, config_dir, _countof(c->config_dir) - 1);
@@ -108,6 +106,11 @@ AddConfigFileToList(int config, const TCHAR *filename, const TCHAR *config_dir)
     c->manage.skaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
     c->manage.skaddr.sin_port = htons(25340 + config);
 
+#ifndef DISABLE_CHANGE_PASSWORD
+    if (CheckKeyFileWriteAccess (c))
+        c->flags |= FLAG_ALLOW_CHANGE_PASSPHRASE;
+#endif
+
     /* Check if connection should be autostarted */
     for (i = 0; i < MAX_CONFIGS && o.auto_connect[i]; ++i)
     {
@@ -116,6 +119,18 @@ AddConfigFileToList(int config, const TCHAR *filename, const TCHAR *config_dir)
             c->auto_connect = true;
             break;
         }
+    }
+    /* check whether passwords are saved */
+    if (o.disable_save_passwords)
+    {
+        DisableSavePasswords(c);
+    }
+    else
+    {
+        if (IsAuthPassSaved(c->config_name))
+            c->flags |= FLAG_SAVE_AUTH_PASS;
+        if (IsKeyPassSaved(c->config_name))
+            c->flags |= FLAG_SAVE_KEY_PASS;
     }
 }
 
@@ -127,7 +142,6 @@ BuildFileList0(const TCHAR *config_dir, bool warn_duplicates)
     HANDLE find_handle;
     TCHAR find_string[MAX_PATH];
     TCHAR subdir_table[MAX_CONFIG_SUBDIRS][MAX_PATH];
-    TCHAR fullpath[MAX_PATH];
     int subdirs = 0;
     int i;
 
@@ -148,8 +162,6 @@ BuildFileList0(const TCHAR *config_dir, bool warn_duplicates)
         match_t match_type = match(&find_obj, o.ext_string);
         if (match_type == match_file)
         {
-            _sntprintf_0(fullpath, _T("%s\\%s"), config_dir, find_obj.cFileName);
-
             if (ConfigAlreadyExists(find_obj.cFileName))
             {
                 if (warn_duplicates)
@@ -157,7 +169,7 @@ BuildFileList0(const TCHAR *config_dir, bool warn_duplicates)
                 continue;
             }
 
-            if (CheckReadAccess (fullpath))
+            if (CheckReadAccess (config_dir, find_obj.cFileName))
                 AddConfigFileToList(o.num_configs++, find_obj.cFileName, config_dir);
         }
         else if (match_type == match_dir)
@@ -204,7 +216,8 @@ BuildFileList0(const TCHAR *config_dir, bool warn_duplicates)
                 continue;
             }
 
-            AddConfigFileToList(o.num_configs++, find_obj.cFileName, subdir_table[i]);
+            if (CheckReadAccess (subdir_table[i], find_obj.cFileName))
+                AddConfigFileToList(o.num_configs++, find_obj.cFileName, subdir_table[i]);
         } while (FindNextFile(find_handle, &find_obj));
 
         FindClose(find_handle);
@@ -216,7 +229,16 @@ BuildFileList()
 {
     static bool issue_warnings = true;
 
-    o.num_configs = 0;
+    if (o.silent_connection)
+        issue_warnings = false;
+
+    /*
+     * If no connections are active reset num_configs and rescan
+     * to make a new list. Else we keep all current configs and
+     * rescan to add any new one's found
+     */
+    if (CountConnState(disconnected) == o.num_configs)
+        o.num_configs = 0;
 
     BuildFileList0 (o.config_dir, issue_warnings);
 
@@ -224,7 +246,7 @@ BuildFileList()
         BuildFileList0 (o.global_config_dir, issue_warnings);
 
     if (o.num_configs == 0 && issue_warnings)
-        ShowLocalizedMsg(IDS_NFO_NO_CONFIGS);
+        ShowLocalizedMsg(IDS_NFO_NO_CONFIGS, o.config_dir, o.global_config_dir);
 
     issue_warnings = false;
 }

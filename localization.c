@@ -63,7 +63,7 @@ FindResourceLang(PTSTR resType, PTSTR resId, LANGID langId)
 }
 
 
-static LANGID
+LANGID
 GetGUILanguage(void)
 {
     if (gui_language != 0)
@@ -236,12 +236,22 @@ ShowLocalizedMsg(const UINT stringId, ...)
     va_end(args);
 }
 
-
-HICON
-LoadLocalizedIcon(const UINT iconId)
+static HICON
+LoadLocalizedIconEx(const UINT iconId, int cxDesired, int cyDesired)
 {
     LANGID langId = GetGUILanguage();
 
+    HICON hIcon =
+            (HICON) LoadImage (o.hInstance, MAKEINTRESOURCE(iconId),
+                    IMAGE_ICON, cxDesired, cyDesired, LR_DEFAULTSIZE|LR_SHARED);
+    if (hIcon)
+        return hIcon;
+    else
+        PrintDebug (L"Loading icon using LoadImage failed.");
+
+    /* Fallback to CreateIconFromResource which always scales
+     * from the first image in the resource
+     */
     /* find group icon resource */
     HRSRC res = FindResourceLang(RT_GROUP_ICON, MAKEINTRESOURCE(iconId), langId);
     if (res == NULL)
@@ -268,9 +278,29 @@ LoadLocalizedIcon(const UINT iconId)
     if (resSize == 0)
         return NULL;
 
-    return CreateIconFromResource(resInfo, resSize, TRUE, 0x30000);
+    /* Note: this uses the first icon in the resource and scales it */
+    hIcon = CreateIconFromResourceEx(resInfo, resSize, TRUE, 0x30000,
+            cxDesired, cyDesired, LR_DEFAULTSIZE|LR_SHARED);
+    return hIcon;
 }
 
+HICON
+LoadLocalizedIcon(const UINT iconId)
+{
+   /* get the required normal icon size (e.g., taskbar icon) */
+   int cx = GetSystemMetrics(SM_CXICON);
+   int cy = GetSystemMetrics(SM_CYICON);
+   return LoadLocalizedIconEx(iconId, cx, cy);
+}
+
+HICON
+LoadLocalizedSmallIcon(const UINT iconId)
+{
+   /* get the required small icon size (e.g., tray icon) */
+   int cx = GetSystemMetrics(SM_CXSMICON);
+   int cy = GetSystemMetrics(SM_CYSMICON);
+   return LoadLocalizedIconEx(iconId, cx, cy);
+}
 
 LPCDLGTEMPLATE
 LocalizedDialogResource(const UINT dialogId)
@@ -354,9 +384,54 @@ FillLangListProc(UNUSED HANDLE module, UNUSED PTSTR type, UNUSED PTSTR stringId,
     return TRUE;
 }
 
+static BOOL 
+GetLaunchOnStartup()
+{
+	
+    WCHAR regPath[MAX_PATH], exePath[MAX_PATH];	
+    BOOL result = FALSE;
+    HKEY regkey;
+
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_READ, &regkey) == ERROR_SUCCESS) {
+
+        if (GetRegistryValue(regkey, L"OpenVPN-GUI", regPath, MAX_PATH) &&
+            GetModuleFileNameW(NULL, exePath, MAX_PATH)) {
+            if (_wcsicmp(regPath, exePath) == 0)
+                result = TRUE;
+        }
+
+        RegCloseKey(regkey);
+
+    }
+	
+    return result;
+
+}
+
+static void
+SetLaunchOnStartup(BOOL value) 
+{
+
+    WCHAR exePath[MAX_PATH];
+    HKEY regkey;
+
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_WRITE, &regkey) == ERROR_SUCCESS) {
+
+        if (value) {
+            if (GetModuleFileNameW(NULL, exePath, MAX_PATH)) 
+                SetRegistryValue(regkey, L"OpenVPN-GUI", exePath);
+        }
+        else 
+            RegDeleteValue(regkey, L"OpenVPN-GUI");            
+
+        RegCloseKey(regkey);
+
+    }
+
+}
 
 INT_PTR CALLBACK
-LanguageSettingsDlgProc(HWND hwndDlg, UINT msg, UNUSED WPARAM wParam, LPARAM lParam)
+GeneralSettingsDlgProc(HWND hwndDlg, UINT msg, UNUSED WPARAM wParam, LPARAM lParam)
 {
     LPPSHNOTIFY psn;
     langProcData langData = {
@@ -379,6 +454,22 @@ LanguageSettingsDlgProc(HWND hwndDlg, UINT msg, UNUSED WPARAM wParam, LPARAM lPa
         /* Clear language id data for the selected item */
         ComboBox_SetItemData(langData.languages, ComboBox_GetCurSel(langData.languages), 0);
 
+        if (GetLaunchOnStartup())
+            Button_SetCheck(GetDlgItem(hwndDlg, ID_CHK_STARTUP), BST_CHECKED);
+
+        if (o.log_append)
+            Button_SetCheck(GetDlgItem(hwndDlg, ID_CHK_LOG_APPEND), BST_CHECKED);
+        if (o.silent_connection)
+            Button_SetCheck(GetDlgItem(hwndDlg, ID_CHK_SILENT), BST_CHECKED);
+        if (o.show_balloon == 0)
+            CheckRadioButton (hwndDlg, ID_RB_BALLOON0, ID_RB_BALLOON2, ID_RB_BALLOON0);
+        else if (o.show_balloon == 1)
+            CheckRadioButton (hwndDlg, ID_RB_BALLOON0, ID_RB_BALLOON2, ID_RB_BALLOON1);
+        else if (o.show_balloon == 2)
+            CheckRadioButton (hwndDlg, ID_RB_BALLOON0, ID_RB_BALLOON2, ID_RB_BALLOON2);
+        if (o.show_script_window)
+            Button_SetCheck(GetDlgItem(hwndDlg, ID_CHK_SHOW_SCRIPT_WIN), BST_CHECKED);
+
         break;
 
     case WM_NOTIFY:
@@ -390,6 +481,23 @@ LanguageSettingsDlgProc(HWND hwndDlg, UINT msg, UNUSED WPARAM wParam, LPARAM lPa
 
             if (langId != 0)
                 SetGUILanguage(langId);
+
+            SetLaunchOnStartup(Button_GetCheck(GetDlgItem(hwndDlg, ID_CHK_STARTUP)) == BST_CHECKED);
+
+            o.log_append =
+                (Button_GetCheck(GetDlgItem(hwndDlg, ID_CHK_LOG_APPEND)) == BST_CHECKED);
+            o.silent_connection =
+                (Button_GetCheck(GetDlgItem(hwndDlg, ID_CHK_SILENT)) == BST_CHECKED);
+            if (IsDlgButtonChecked(hwndDlg, ID_RB_BALLOON0))
+                o.show_balloon = 0;
+            else if (IsDlgButtonChecked(hwndDlg, ID_RB_BALLOON2))
+                o.show_balloon = 2;
+            else
+                o.show_balloon = 1;
+            o.show_script_window =
+                (Button_GetCheck(GetDlgItem(hwndDlg, ID_CHK_SHOW_SCRIPT_WIN)) == BST_CHECKED);
+
+            SaveRegistryKeys();
 
             SetWindowLongPtr(hwndDlg, DWLP_MSGRESULT, PSNRET_NOERROR);
             return TRUE;

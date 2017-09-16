@@ -20,7 +20,7 @@
  *  59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef OEPNVPN_H
+#ifndef OPENVPN_H
 #define OPENVPN_H
 
 BOOL StartOpenVPN(connection_t *);
@@ -35,7 +35,18 @@ void OnLogLine(connection_t *, char *);
 void OnStateChange(connection_t *, char *);
 void OnPassword(connection_t *, char *);
 void OnStop(connection_t *, char *);
+void OnNeedOk(connection_t *, char *);
+void OnNeedStr(connection_t *, char *);
+void OnEcho(connection_t *, char *);
+
+void ResetSavePasswords(connection_t *);
 
 extern const TCHAR *cfgProp;
+
+/* These error codes are from openvpn service sources */
+#define ERROR_OPENVPN_STARTUP 0x20000000
+#define ERROR_STARTUP_DATA 0x20000001
+#define ERROR_MESSAGE_DATA 0x20000002
+#define ERROR_MESSAGE_TYPE 0x20000003
 
 #endif

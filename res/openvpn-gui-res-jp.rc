@@ -23,7 +23,7 @@
  */
 
 /* Passphrase Dialog */
-ID_DLG_PASSPHRASE DIALOGEX 6, 18, 120, 51
+ID_DLG_PASSPHRASE DIALOGEX 6, 18, 160, 83
 STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
 EXSTYLE WS_EX_TOPMOST
 CAPTION "OpenVPN"
@@ -32,12 +32,14 @@ LANGUAGE LANG_JAPANESE, SUBLANG_DEFAULT
 BEGIN
     LTEXT "パスワード:", 201, 6, 6, 100, 10
     EDITTEXT ID_EDT_PASSPHRASE, 6, 17, 107, 12, ES_PASSWORD | ES_AUTOHSCROLL
-    PUSHBUTTON "OK", IDOK, 6, 33, 50, 14
-    PUSHBUTTON "キャンセル", IDCANCEL, 64, 33, 50, 14
+    CHECKBOX "Save password", ID_CHK_SAVE_PASS, 6, 33, 100, 10
+    PUSHBUTTON "OK", IDOK, 20, 49, 50, 14
+    PUSHBUTTON "キャンセル", IDCANCEL, 90, 49, 50, 14
+    LTEXT "", ID_TXT_WARNING, 6, 65, 100, 10
 END
 
 /* Auth Username/Password Dialog */
-ID_DLG_AUTH DIALOG 6, 18, 160, 62
+ID_DLG_AUTH DIALOG 6, 18, 160, 95
 STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
 CAPTION "OpenVPN - ユーザー認証"
 FONT 8, "Microsoft Sans Serif"
@@ -47,12 +49,14 @@ BEGIN
     LTEXT "パスワード:", 0, 6, 26, 50, 10
     EDITTEXT ID_EDT_AUTH_USER, 60, 6, 94, 12, ES_AUTOHSCROLL
     EDITTEXT ID_EDT_AUTH_PASS, 60, 23, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
-    PUSHBUTTON "OK", IDOK, 20, 42, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
-    PUSHBUTTON "キャンセル", IDCANCEL, 90, 42, 52, 14
+    CHECKBOX "Save password", ID_CHK_SAVE_PASS, 6, 42, 100, 10
+    PUSHBUTTON "OK", IDOK, 20, 58, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
+    PUSHBUTTON "キャンセル", IDCANCEL, 90, 58, 52, 14
+    LTEXT "", ID_TXT_WARNING, 6, 74, 150, 10
 END
 
 /* Auth Username/Password/Challenge Dialog */
-ID_DLG_AUTH_CHALLENGE DIALOG 6, 18, 160, 96
+ID_DLG_AUTH_CHALLENGE DIALOG 6, 18, 160, 129
 STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
 CAPTION "OpenVPN - User Authentication"
 FONT 8, "Microsoft Sans Serif"
@@ -65,8 +69,23 @@ BEGIN
     EDITTEXT ID_EDT_AUTH_PASS, 60, 23, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
     LTEXT "", ID_TXT_AUTH_CHALLENGE, 6, 43, 148, 10
     EDITTEXT ID_EDT_AUTH_CHALLENGE, 60, 57, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
-    PUSHBUTTON "OK", IDOK, 20, 76, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
-    PUSHBUTTON "キャンセル", IDCANCEL, 90, 76, 52, 14
+    CHECKBOX "Save password", ID_CHK_SAVE_PASS, 6, 76, 100, 10
+    PUSHBUTTON "OK", IDOK, 20, 92, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
+    PUSHBUTTON "キャンセル", IDCANCEL, 90, 92, 52, 14
+    LTEXT "", ID_TXT_WARNING, 6, 108, 150, 10
+END
+/* Challenge Response Dialog */
+ID_DLG_CHALLENGE_RESPONSE DIALOG 6, 18, 212, 72
+STYLE WS_SIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
+CAPTION "OpenVPN - Challenge Response"
+FONT 8, "Microsoft Sans Serif"
+LANGUAGE LANG_JAPANESE, SUBLANG_DEFAULT
+BEGIN
+    LTEXT "", ID_TXT_DESCRIPTION, 6, 9, 208, 10
+    LTEXT "Response:", 0, 6, 30, 50, 10
+    EDITTEXT ID_EDT_RESPONSE, 60, 27, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
+    PUSHBUTTON "OK", IDOK, 20, 51, 50, 14, BS_PUSHBUTTON | WS_TABSTOP
+    PUSHBUTTON "キャンセル", IDCANCEL, 90, 51, 52, 14
 END
 
 /* Status Dialog */
@@ -132,6 +151,47 @@ BEGIN
     GROUPBOX "ユーザーインターフェイス", 201, 6, 12, 235, 30
     LTEXT "言語:", ID_TXT_LANGUAGE, 17, 25, 52, 12
     COMBOBOX ID_CMB_LANGUAGE, 39, 23, 189, 400, CBS_DROPDOWNLIST | WS_TABSTOP
+    GROUPBOX "Startup", 202, 6, 47, 235, 30
+    AUTOCHECKBOX "Launch on Windows startup", ID_CHK_STARTUP, 17, 59, 200, 12
+
+    GROUPBOX "Preferences", 202, 6, 82, 235, 90
+    AUTOCHECKBOX "ログファイルに追記", ID_CHK_LOG_APPEND, 17, 95, 200, 10
+    AUTOCHECKBOX "スクリプト実行ウィンドウを表示する", ID_CHK_SHOW_SCRIPT_WIN, 17, 110, 200, 10
+    AUTOCHECKBOX "接続時にステータスダイアログを表示しない", ID_CHK_SILENT, 17, 125, 200, 10
+    LTEXT "Show Balloon", ID_TXT_BALLOON, 17, 140, 100, 10
+    AUTORADIOBUTTON "初期接続時", ID_RB_BALLOON1, 22, 155, 60, 10, WS_GROUP | WS_TABSTOP
+    AUTORADIOBUTTON "毎回の接続時", ID_RB_BALLOON2, 96, 155, 90, 10
+    AUTORADIOBUTTON "表示しない", ID_RB_BALLOON0, 181, 155, 40, 10
+END
+
+/* Advanced Dialog */
+ID_DLG_ADVANCED DIALOGEX 6, 18, 252, 218
+STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | DS_CENTER
+CAPTION "Advanced"
+FONT 8, "Microsoft Sans Serif"
+LANGUAGE LANG_JAPANESE, SUBLANG_DEFAULT
+BEGIN
+    GROUPBOX "設定ファイル", 201, 6, 12, 235, 45
+    LTEXT "ディレクトリ:", ID_TXT_FOLDER, 17, 25, 52, 10
+    LTEXT "拡張子:", ID_TXT_EXTENSION, 17, 40, 52, 10
+    EDITTEXT ID_EDT_CONFIG_DIR, 58, 23, 145, 12, ES_AUTOHSCROLL
+    EDITTEXT ID_EDT_CONFIG_EXT, 58, 38, 25, 12, ES_AUTOHSCROLL
+    PUSHBUTTON "…", ID_BTN_CONFIG_DIR, 208, 23, 25, 12
+
+    GROUPBOX "ログファイル", 202, 6, 62, 235, 30
+    LTEXT "ディレクトリ:", ID_TXT_FOLDER, 17, 74, 52, 10
+    EDITTEXT ID_EDT_LOG_DIR, 58, 72, 145, 12, ES_AUTOHSCROLL
+    PUSHBUTTON "…", ID_BTN_LOG_DIR, 208, 72, 25, 12
+
+    GROUPBOX "スクリプトの終了を待つ時間", 201, 6, 97, 235, 60
+    LTEXT "接続前スクリプト:", ID_TXT_PRECONNECT_TIMEOUT, 17, 110, 120, 10
+    LTEXT "接続スクリプト:", ID_TXT_CONNECT_TIMEOUT, 17, 125, 120, 10
+    LTEXT "切断スクリプト:", ID_TXT_DISCONNECT_TIMEOUT, 17, 140, 120, 10
+    EDITTEXT ID_EDT_PRECONNECT_TIMEOUT, 143, 108, 20, 12, ES_AUTOHSCROLL|ES_NUMBER
+    EDITTEXT ID_EDT_CONNECT_TIMEOUT, 143, 123, 20, 12, ES_AUTOHSCROLL|ES_NUMBER
+    EDITTEXT ID_EDT_DISCONNECT_TIMEOUT, 143, 138, 20, 12, ES_AUTOHSCROLL|ES_NUMBER
+
+    AUTOCHECKBOX "サービスのみのモードを有効にする", ID_CHK_SERVICE_ONLY, 6, 162, 200, 12
 END
 
 /* About Dialog */
@@ -142,16 +202,18 @@ FONT 8, "Microsoft Sans Serif"
 LANGUAGE LANG_JAPANESE, SUBLANG_DEFAULT
 BEGIN
     ICON ID_ICO_APP, 0, 8, 16, 21, 20
-    LTEXT "OpenVPN GUI v" PACKAGE_VERSION " - A Windows GUI for OpenVPN\n" \
+    LTEXT "OpenVPN GUI v" PACKAGE_VERSION_RESOURCE_STR " - A Windows GUI for OpenVPN\n" \
           "Copyright (C) 2004-2005 Mathias Sundman <info@openvpn.se>\n" \
-          "http://openvpn.se/", 0, 36, 15, 206, 26
+          "Copyright (C) 2008-2014 Heiko Hund <heikoh@users.sf.net>\n" \
+          "Copyright (C) 2012-2016 OpenVPN GUI contributors\n" \
+          "https://github.com/OpenVPN/openvpn-gui/", 0, 36, 15, 206, 42
     LTEXT "OpenVPN - An application to securely tunnel IP networks " \
-          "over a single UDP port, with support for SSL/TLS-based " \
+          "over a single TCP/UDP port, with support for SSL/TLS-based " \
           "session authentication and key exchange, packet " \
           "encryption, packet authentication, and packet compression.\n" \
           "\n" \
-          "Copyright (C) 2002-2005 OpenVPN Solutions LLC <info@openvpn.net>\n" \
-          "http://openvpn.net/", 0, 8, 45, 235, 56
+          "Copyright (C) 2002-2016 OpenVPN Technologies, Inc <info@openvpn.net>\n" \
+          "https://openvpn.net/", 0, 8, 61, 240, 64
 END
 
 /* Proxy Authentication Dialog */
@@ -333,7 +395,6 @@ BEGIN
     IDS_ERR_GET_TEMP_PATH "GetTempPath()で一時ディレクトリが取得できませんでした。""C:\\"" を使用します。"
 
     /* service */
-    IDS_ERR_OPEN_SCMGR_ADMIN "OpenSCManagerに失敗しました。サービスを開始するには管理者権限が必要です。"
     IDS_ERR_OPEN_VPN_SERVICE """OpenVPNService"" のオープンに失敗しました。"
     IDS_ERR_START_SERVICE """OpenVPNService"" の開始に失敗しました。"
     IDS_ERR_QUERY_SERVICE  "サービス状態の取得に失敗しました。"

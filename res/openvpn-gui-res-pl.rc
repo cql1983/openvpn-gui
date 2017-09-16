@@ -22,7 +22,7 @@
  */
 
 /* Passphrase Dialog */
-ID_DLG_PASSPHRASE DIALOGEX 6, 18, 120, 51
+ID_DLG_PASSPHRASE DIALOGEX 6, 18, 160, 83
 STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
 EXSTYLE WS_EX_TOPMOST
 CAPTION "OpenVPN"
@@ -31,12 +31,14 @@ LANGUAGE LANG_POLISH, SUBLANG_DEFAULT
 BEGIN
     LTEXT "Hasło:", 201, 6, 6, 100, 10
     EDITTEXT ID_EDT_PASSPHRASE, 6, 17, 107, 12, ES_PASSWORD | ES_AUTOHSCROLL
-    PUSHBUTTON "OK", IDOK, 6, 33, 50, 14
-    PUSHBUTTON "Anuluj", IDCANCEL, 64, 33, 50, 14
+    CHECKBOX "Save password", ID_CHK_SAVE_PASS, 6, 33, 100, 10
+    PUSHBUTTON "OK", IDOK, 20, 49, 50, 14
+    PUSHBUTTON "Anuluj", IDCANCEL, 90, 49, 50, 14
+    LTEXT "", ID_TXT_WARNING, 6, 65, 100, 10
 END
 
 /* Auth Username/Password Dialog */
-ID_DLG_AUTH DIALOG 6, 18, 160, 62
+ID_DLG_AUTH DIALOG 6, 18, 160, 95
 STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
 CAPTION "OpenVPN - Autentykacja Użytkownika"
 FONT 8, "Microsoft Sans Serif"
@@ -46,12 +48,14 @@ BEGIN
     LTEXT "Hasło:", 0, 6, 26, 50, 10
     EDITTEXT ID_EDT_AUTH_USER, 60, 6, 94, 12, ES_AUTOHSCROLL
     EDITTEXT ID_EDT_AUTH_PASS, 60, 23, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
-    PUSHBUTTON "OK", IDOK, 20, 42, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
-    PUSHBUTTON "Anuluj", IDCANCEL, 90, 42, 52, 14
+    CHECKBOX "Save password", ID_CHK_SAVE_PASS, 6, 42, 100, 10
+    PUSHBUTTON "OK", IDOK, 20, 58, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
+    PUSHBUTTON "Anuluj", IDCANCEL, 90, 58, 52, 14
+    LTEXT "", ID_TXT_WARNING, 6, 74, 150, 10
 END
 
 /* Auth Username/Password/Challenge Dialog */
-ID_DLG_AUTH_CHALLENGE DIALOG 6, 18, 160, 96
+ID_DLG_AUTH_CHALLENGE DIALOG 6, 18, 160, 129
 STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
 CAPTION "OpenVPN - User Authentication"
 FONT 8, "Microsoft Sans Serif"
@@ -64,8 +68,24 @@ BEGIN
     EDITTEXT ID_EDT_AUTH_PASS, 60, 23, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
     LTEXT "", ID_TXT_AUTH_CHALLENGE, 6, 43, 148, 10
     EDITTEXT ID_EDT_AUTH_CHALLENGE, 60, 57, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
-    PUSHBUTTON "OK", IDOK, 20, 76, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
-    PUSHBUTTON "Anuluj", IDCANCEL, 90, 76, 52, 14
+    CHECKBOX "Save password", ID_CHK_SAVE_PASS, 6, 76, 100, 10
+    PUSHBUTTON "OK", IDOK, 20, 92, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
+    PUSHBUTTON "Anuluj", IDCANCEL, 90, 92, 52, 14
+    LTEXT "", ID_TXT_WARNING, 6, 108, 150, 10
+END
+
+/* Challenge Response Dialog */
+ID_DLG_CHALLENGE_RESPONSE DIALOG 6, 18, 212, 72
+STYLE WS_SIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
+CAPTION "OpenVPN - Challenge Response"
+FONT 8, "Microsoft Sans Serif"
+LANGUAGE LANG_POLISH, SUBLANG_DEFAULT
+BEGIN
+    LTEXT "", ID_TXT_DESCRIPTION, 6, 9, 208, 10
+    LTEXT "Response:", 0, 6, 30, 50, 10
+    EDITTEXT ID_EDT_RESPONSE, 60, 27, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
+    PUSHBUTTON "OK", IDOK, 20, 51, 50, 14, BS_PUSHBUTTON | WS_TABSTOP
+    PUSHBUTTON "Anuluj", IDCANCEL, 90, 51, 52, 14
 END
 
 /* Status Dialog */
@@ -131,6 +151,47 @@ BEGIN
     GROUPBOX "Interfejs Użytkownika", 201, 6, 12, 235, 30
     LTEXT "Język:", ID_TXT_LANGUAGE, 17, 25, 52, 12
     COMBOBOX ID_CMB_LANGUAGE, 42, 23, 186, 400, CBS_DROPDOWNLIST | WS_TABSTOP
+    GROUPBOX "Startup", 202, 6, 47, 235, 30
+    AUTOCHECKBOX "Launch on Windows startup", ID_CHK_STARTUP, 17, 59, 200, 12
+
+    GROUPBOX "Preferences", 202, 6, 82, 235, 90
+    AUTOCHECKBOX "Append to log", ID_CHK_LOG_APPEND, 17, 95, 60, 10
+    AUTOCHECKBOX "Show script window", ID_CHK_SHOW_SCRIPT_WIN, 17, 110, 200, 10
+    AUTOCHECKBOX "Silent connection", ID_CHK_SILENT, 17, 125, 200, 10
+    LTEXT "Show Balloon", ID_TXT_BALLOON, 17, 140, 100, 10
+    AUTORADIOBUTTON "On connect", ID_RB_BALLOON1, 28, 155, 50, 10, WS_GROUP | WS_TABSTOP
+    AUTORADIOBUTTON "On connect/reconnect", ID_RB_BALLOON2, 86, 155, 90, 10
+    AUTORADIOBUTTON "Never", ID_RB_BALLOON0, 181, 155, 40, 10
+END
+
+/* Advanced Dialog */
+ID_DLG_ADVANCED DIALOGEX 6, 18, 252, 218
+STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | DS_CENTER
+CAPTION "Advanced"
+FONT 8, "Microsoft Sans Serif"
+LANGUAGE LANG_POLISH, SUBLANG_DEFAULT
+BEGIN
+    GROUPBOX "Configuration Files", 201, 6, 12, 235, 45
+    LTEXT "Folder:", ID_TXT_FOLDER, 17, 25, 32, 10
+    LTEXT "Extension:", ID_TXT_EXTENSION, 17, 40, 52, 10
+    EDITTEXT ID_EDT_CONFIG_DIR, 53, 23, 150, 12, ES_AUTOHSCROLL
+    EDITTEXT ID_EDT_CONFIG_EXT, 53, 38, 25, 12, ES_AUTOHSCROLL
+    PUSHBUTTON "…", ID_BTN_CONFIG_DIR, 208, 23, 25, 12
+
+    GROUPBOX "Log Files", 202, 6, 62, 235, 30
+    LTEXT "Folder:", ID_TXT_FOLDER, 17, 74, 32, 10
+    EDITTEXT ID_EDT_LOG_DIR, 53, 72, 150, 12, ES_AUTOHSCROLL
+    PUSHBUTTON "…", ID_BTN_LOG_DIR, 208, 72, 25, 12
+
+    GROUPBOX "Script Timeout", 201, 6, 97, 235, 60
+    LTEXT "Preconnect script timeout:", ID_TXT_PRECONNECT_TIMEOUT, 17, 110, 100, 10
+    LTEXT "Connect script timeout:", ID_TXT_CONNECT_TIMEOUT, 17, 125, 90, 10
+    LTEXT "Disconnect script timeout:", ID_TXT_DISCONNECT_TIMEOUT, 17, 140, 90, 10
+    EDITTEXT ID_EDT_PRECONNECT_TIMEOUT, 103, 108, 20, 12, ES_AUTOHSCROLL|ES_NUMBER
+    EDITTEXT ID_EDT_CONNECT_TIMEOUT, 103, 123, 20, 12, ES_AUTOHSCROLL|ES_NUMBER
+    EDITTEXT ID_EDT_DISCONNECT_TIMEOUT, 103, 138, 20, 12, ES_AUTOHSCROLL|ES_NUMBER
+
+    AUTOCHECKBOX "Service only", ID_CHK_SERVICE_ONLY, 6, 162, 100, 12
 END
 
 /* About Dialog */
@@ -141,16 +202,18 @@ FONT 8, "Microsoft Sans Serif"
 LANGUAGE LANG_POLISH, SUBLANG_DEFAULT
 BEGIN
     ICON ID_ICO_APP, 0, 8, 16, 21, 20
-    LTEXT "OpenVPN GUI v" PACKAGE_VERSION " - Windows GUI dla OpenVPN-a\n" \
+    LTEXT "OpenVPN GUI v" PACKAGE_VERSION_RESOURCE_STR " - Windows GUI dla OpenVPN-a\n" \
           "Copyright (C) 2004-2005 Mathias Sundman <info@openvpn.se>\n" \
-          "http://openvpn.se/", 0, 36, 15, 206, 26
+          "Copyright (C) 2008-2014 Heiko Hund <heikoh@users.sf.net>\n" \
+          "Copyright (C) 2012-2016 OpenVPN GUI contributors\n" \
+          "https://github.com/OpenVPN/openvpn-gui/", 0, 36, 15, 206, 42
     LTEXT "OpenVPN - Aplikacja do bezpiecznego tunelowania sieci IP" \
-          "przy pomocy pojedynczego portu UDP, z autentykacją sesji," \
+          "przy pomocy pojedynczego portu TCP/UDP, z autentykacją sesji," \
           "wymianą klucza, szyfrowaniem, kompresją i autentykacją" \
           "pakietów opartą na protokole SSL/TLS\n" \
           "\n" \
-          "Copyright (C) 2002-2005 OpenVPN Solutions LLC <info@openvpn.net>\n" \
-          "http://openvpn.net/", 0, 8, 45, 235, 56
+          "Copyright (C) 2002-2016 OpenVPN Technologies, Inc <info@openvpn.net>\n" \
+          "https://openvpn.net/", 0, 8, 61, 240, 64
 END
 
 /* Proxy Authentication Dialog */
@@ -332,7 +395,6 @@ BEGIN
     IDS_ERR_GET_TEMP_PATH "Błąd przy ustalaniu katalogu tymczasowego przy pomocy funkcji GetTempPath(). Użyty zostanie katalog ""C:\\""."
 
     /* service */
-    IDS_ERR_OPEN_SCMGR_ADMIN "Błąd OpenSCManager'a. Do uruchomienia usługi wymagane są uprawnienia administratora."
     IDS_ERR_OPEN_VPN_SERVICE "Błąd otwarcia usługi ""OpenVPNService"""
     IDS_ERR_START_SERVICE "Uruchomienie usługi ""OpenVPNService"" nie powiodło się."
     IDS_ERR_QUERY_SERVICE "Błąd przy odczycie statusu usługi."

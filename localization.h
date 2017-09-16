@@ -28,10 +28,12 @@ int LoadLocalizedStringBuf(PTSTR, const int, const UINT, ...);
 void ShowLocalizedMsg(const UINT, ...);
 int ShowLocalizedMsgEx(const UINT, LPCTSTR, const UINT, ...);
 HICON LoadLocalizedIcon(const UINT);
+HICON LoadLocalizedSmallIcon(const UINT);
 LPCDLGTEMPLATE LocalizedDialogResource(const UINT);
 INT_PTR LocalizedDialogBoxParam(const UINT, DLGPROC, const LPARAM);
 HWND CreateLocalizedDialogParam(const UINT, DLGPROC, const LPARAM);
 HWND CreateLocalizedDialog(const UINT, DLGPROC);
-INT_PTR CALLBACK LanguageSettingsDlgProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK GeneralSettingsDlgProc(HWND, UINT, WPARAM, LPARAM);
+LANGID GetGUILanguage(void);
 
 #endif

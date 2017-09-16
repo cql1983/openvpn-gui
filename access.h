@@ -1,7 +1,7 @@
 /*
- *  OpenVPN-GUI -- A Windows GUI for OpenVPN.
+ *  This file is a part of OpenVPN-GUI -- A Windows GUI for OpenVPN.
  *
- *  Copyright (C) 2013 Heiko Hund <heikoh@users.sf.net>
+ *  Copyright (C) 2016 Selva Nair <selva.nair@gmail.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,24 +19,11 @@
  *  59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef MISC_H
-#define MISC_H
+#ifndef ACCESS_H
+#define ACCESS_H
 
-BOOL ManagementCommandFromInput(connection_t *, LPCSTR, HWND, int);
-BOOL ManagementCommandFromInputBase64(connection_t *, LPCSTR, HWND, int, int);
+#include "options.h"
 
-BOOL EnsureDirExists(LPTSTR);
+BOOL AuthorizeConfig (const connection_t *c);
 
-BOOL streq(LPCSTR, LPCSTR);
-BOOL wcsbegins(LPCWSTR, LPCWSTR);
-
-BOOL ForceForegroundWindow(HWND);
-
-BOOL IsUserAdmin(VOID);
-HANDLE InitSemaphore (void);
-BOOL CheckFileAccess (const TCHAR *path, int access);
-
-BOOL Base64Encode(const char *input, int input_len, char **output);
-int Base64Decode(const char *input, char **output);
-WCHAR *Widen(const char *utf8);
 #endif

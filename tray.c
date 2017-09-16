@@ -60,7 +60,7 @@ CreatePopupMenus()
 
     if (o.num_configs == 1) {
         /* Create Main menu with actions */
-        if (o.service_only[0] == '0') {
+        if (o.service_only == 0) {
             AppendMenu(hMenu, MF_STRING, IDM_CONNECTMENU, LoadLocalizedString(IDS_MENU_CONNECT));
             AppendMenu(hMenu, MF_STRING, IDM_DISCONNECTMENU, LoadLocalizedString(IDS_MENU_DISCONNECT));
             AppendMenu(hMenu, MF_STRING, IDM_STATUSMENU, LoadLocalizedString(IDS_MENU_STATUS));
@@ -75,21 +75,15 @@ CreatePopupMenus()
 
         AppendMenu(hMenu, MF_STRING, IDM_VIEWLOGMENU, LoadLocalizedString(IDS_MENU_VIEWLOG));
 
-        if (o.allow_edit[0] == '1')
-            AppendMenu(hMenu, MF_STRING, IDM_EDITMENU, LoadLocalizedString(IDS_MENU_EDITCONFIG));
+        AppendMenu(hMenu, MF_STRING, IDM_EDITMENU, LoadLocalizedString(IDS_MENU_EDITCONFIG));
+        AppendMenu(hMenu, MF_STRING, IDM_CLEARPASSMENU, LoadLocalizedString(IDS_MENU_CLEARPASS));
 
 #ifndef DISABLE_CHANGE_PASSWORD
-        if (o.allow_password[0] == '1')
+        if (o.conn[0].flags & FLAG_ALLOW_CHANGE_PASSPHRASE)
             AppendMenu(hMenu, MF_STRING, IDM_PASSPHRASEMENU, LoadLocalizedString(IDS_MENU_PASSPHRASE));
 #endif
 
         AppendMenu(hMenu, MF_SEPARATOR, 0, 0);
-
-        if (o.allow_service[0] == '1' && o.service_only[0] == '0')
-        {
-            AppendMenu(hMenu, MF_POPUP, (UINT_PTR) hMenuService, LoadLocalizedString(IDS_MENU_SERVICE));
-            AppendMenu(hMenu, MF_SEPARATOR, 0, 0);
-        }
 
         AppendMenu(hMenu, MF_STRING, IDM_IMPORT, LoadLocalizedString(IDS_MENU_IMPORT));
         AppendMenu(hMenu, MF_STRING ,IDM_SETTINGS, LoadLocalizedString(IDS_MENU_SETTINGS));
@@ -106,11 +100,7 @@ CreatePopupMenus()
         if (o.num_configs > 0)
             AppendMenu(hMenu, MF_SEPARATOR, 0, 0);
 
-        if (o.service_only[0] == '0' && o.allow_service[0] == '1') {
-            AppendMenu(hMenu, MF_POPUP, (UINT_PTR) hMenuService, LoadLocalizedString(IDS_MENU_SERVICE));
-            AppendMenu(hMenu, MF_SEPARATOR, 0, 0);
-        }
-        else if (o.service_only[0] == '1') {
+        if (o.service_only) {
             AppendMenu(hMenu, MF_STRING, IDM_SERVICE_START, LoadLocalizedString(IDS_MENU_SERVICEONLY_START));
             AppendMenu(hMenu, MF_STRING, IDM_SERVICE_STOP, LoadLocalizedString(IDS_MENU_SERVICEONLY_STOP));
             AppendMenu(hMenu, MF_STRING, IDM_SERVICE_RESTART, LoadLocalizedString(IDS_MENU_SERVICEONLY_RESTART));
@@ -124,7 +114,7 @@ CreatePopupMenus()
 
         /* Create popup menus for every connection */
         for (i=0; i < o.num_configs; i++) {
-            if (o.service_only[0] == '0') {
+            if (o.service_only == 0) {
                 AppendMenu(hMenuConn[i], MF_STRING, IDM_CONNECTMENU + i, LoadLocalizedString(IDS_MENU_CONNECT));
                 AppendMenu(hMenuConn[i], MF_STRING, IDM_DISCONNECTMENU + i, LoadLocalizedString(IDS_MENU_DISCONNECT));
                 AppendMenu(hMenuConn[i], MF_STRING, IDM_STATUSMENU + i, LoadLocalizedString(IDS_MENU_STATUS));
@@ -133,24 +123,16 @@ CreatePopupMenus()
 
             AppendMenu(hMenuConn[i], MF_STRING, IDM_VIEWLOGMENU + i, LoadLocalizedString(IDS_MENU_VIEWLOG));
 
-            if (o.allow_edit[0] == '1')
-                AppendMenu(hMenuConn[i], MF_STRING, IDM_EDITMENU + i, LoadLocalizedString(IDS_MENU_EDITCONFIG));
+            AppendMenu(hMenuConn[i], MF_STRING, IDM_EDITMENU + i, LoadLocalizedString(IDS_MENU_EDITCONFIG));
+            AppendMenu(hMenuConn[i], MF_STRING, IDM_CLEARPASSMENU + i, LoadLocalizedString(IDS_MENU_CLEARPASS));
 
 #ifndef DISABLE_CHANGE_PASSWORD
-            if (o.allow_password[0] == '1')
+            if (o.conn[i].flags & FLAG_ALLOW_CHANGE_PASSPHRASE)
                 AppendMenu(hMenuConn[i], MF_STRING, IDM_PASSPHRASEMENU + i, LoadLocalizedString(IDS_MENU_PASSPHRASE));
 #endif
 
             SetMenuStatus(&o.conn[i], o.conn[i].state);
         }
-    }
-
-    /* Create service menu */
-    if (o.allow_service[0] == '1' && o.service_only[0] == '0')
-    {
-        AppendMenu(hMenuService, MF_STRING, IDM_SERVICE_START, LoadLocalizedString(IDS_MENU_SERVICE_START));
-        AppendMenu(hMenuService, MF_STRING, IDM_SERVICE_STOP, LoadLocalizedString(IDS_MENU_SERVICE_STOP));
-        AppendMenu(hMenuService, MF_STRING, IDM_SERVICE_RESTART, LoadLocalizedString(IDS_MENU_SERVICE_RESTART));
     }
 
     SetServiceMenuStatus();
@@ -182,8 +164,7 @@ OnNotifyTray(LPARAM lParam)
     case WM_RBUTTONUP:
         /* Recreate popup menus */
         DestroyPopupMenus();
-        if (CountConnState(disconnected) == o.num_configs)
-            BuildFileList();
+        BuildFileList();
         CreatePopupMenus();
 
         GetCursorPos(&pt);
@@ -193,7 +174,7 @@ OnNotifyTray(LPARAM lParam)
         break;
 
     case WM_LBUTTONDBLCLK:
-        if (o.service_only[0] == '1') {
+        if (o.service_only) {
             /* Start or stop OpenVPN service */
             if (o.service_state == service_disconnected) {
                 MyStartService();
@@ -206,16 +187,13 @@ OnNotifyTray(LPARAM lParam)
         else {
             int disconnected_conns = CountConnState(disconnected);
 
-            if (disconnected_conns == o.num_configs) {
-                /* Reread configs and recreate menus if no connection is running */
-                DestroyPopupMenus();
-                BuildFileList();
-                CreatePopupMenus();
+            DestroyPopupMenus();
+            BuildFileList();
+            CreatePopupMenus();
 
-                /* Start connection if only one config exist */
-                if (o.num_configs == 1 && o.conn[0].state == disconnected)
+            /* Start connection if only one config exist */
+            if (o.num_configs == 1 && o.conn[0].state == disconnected)
                     StartOpenVPN(&o.conn[0]);
-            }
             else if (disconnected_conns == o.num_configs - 1) {
                 /* Show status window if only one connection is running */
                 int i;
@@ -249,7 +227,7 @@ ShowTrayIcon()
   ni.hWnd = o.hWnd;
   ni.uFlags = NIF_MESSAGE | NIF_TIP | NIF_ICON;
   ni.uCallbackMessage = WM_NOTIFYICONTRAY;
-  ni.hIcon = LoadLocalizedIcon(ID_ICO_DISCONNECTED);
+  ni.hIcon = LoadLocalizedSmallIcon(ID_ICO_DISCONNECTED);
   _tcsncpy(ni.szTip, LoadLocalizedString(IDS_TIP_DEFAULT), _countof(ni.szTip));
 
   Shell_NotifyIcon(NIM_ADD, &ni);
@@ -313,7 +291,7 @@ SetTrayIcon(conn_state_t state)
     ni.cbSize = sizeof(ni);
     ni.uID = 0;
     ni.hWnd = o.hWnd;
-    ni.hIcon = LoadLocalizedIcon(icon_id);
+    ni.hIcon = LoadLocalizedSmallIcon(icon_id);
     ni.uFlags = NIF_MESSAGE | NIF_TIP | NIF_ICON;
     ni.uCallbackMessage = WM_NOTIFYICONTRAY;
     _tcsncpy(ni.szTip, msg, _countof(ni.szTip));
@@ -385,6 +363,10 @@ SetMenuStatus(connection_t *c, conn_state_t state)
             EnableMenuItem(hMenu, IDM_DISCONNECTMENU, MF_GRAYED);
             EnableMenuItem(hMenu, IDM_STATUSMENU, MF_ENABLED);
         }
+        if (c->flags & (FLAG_SAVE_AUTH_PASS | FLAG_SAVE_KEY_PASS))
+            EnableMenuItem(hMenu, IDM_CLEARPASSMENU, MF_ENABLED);
+        else
+            EnableMenuItem(hMenu, IDM_CLEARPASSMENU, MF_GRAYED);
     }
     else
     {
@@ -416,6 +398,10 @@ SetMenuStatus(connection_t *c, conn_state_t state)
             EnableMenuItem(hMenuConn[i], IDM_DISCONNECTMENU + i, MF_GRAYED);
             EnableMenuItem(hMenuConn[i], IDM_STATUSMENU + i, MF_ENABLED);
         }
+        if (c->flags & (FLAG_SAVE_AUTH_PASS | FLAG_SAVE_KEY_PASS))
+            EnableMenuItem(hMenuConn[i], IDM_CLEARPASSMENU + i, MF_ENABLED);
+        else
+            EnableMenuItem(hMenuConn[i], IDM_CLEARPASSMENU + i, MF_GRAYED);
     }
 }
 
@@ -425,10 +411,10 @@ SetServiceMenuStatus()
 {
     HMENU hMenuHandle;
 
-    if (o.allow_service[0] == '0' && o.service_only[0] == '0')
+    if (o.service_only == 0)
         return;
 
-    if (o.service_only[0] == '1')
+    if (o.service_only)
         hMenuHandle = hMenu;
     else
         hMenuHandle = hMenuService;

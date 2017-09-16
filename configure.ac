@@ -19,9 +19,11 @@ dnl  distribution); if not, write to the Free Software Foundation, Inc.,
 dnl  59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 AC_PREREQ(2.59)
-define([_GUI_VERSION], [11])
-AC_INIT([OpenVPN GUI],[_GUI_VERSION],[openvpn-devel@lists.sourceforge.net],[openvpn-gui],[https://github.com/openvpn/openvpn-gui/])
-AC_DEFINE([PACKAGE_VERSION_RESOURCE], [_GUI_VERSION,0,0,0], [Version in windows resource format])
+define([_GUI_VERSION_MAJOR], [11])
+define([_GUI_VERSION_MINOR], [8])
+AC_INIT([OpenVPN GUI],[_GUI_VERSION_MAJOR],[openvpn-devel@lists.sourceforge.net],[openvpn-gui],[https://github.com/openvpn/openvpn-gui/])
+AC_DEFINE([PACKAGE_VERSION_RESOURCE], [_GUI_VERSION_MAJOR,_GUI_VERSION_MINOR,0,0], [Version in windows resource format])
+AC_DEFINE([PACKAGE_VERSION_RESOURCE_STR], ["_GUI_VERSION_MAJOR._GUI_VERSION_MINOR.0.0"], [Version as a string])
 AC_CONFIG_AUX_DIR([.])
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_SRCDIR([main.h])
@@ -38,37 +40,44 @@ AC_ARG_ENABLE(
 	[enable_distonly="no"]
 )
 
+AC_ARG_ENABLE(
+	[password-change],
+	[AS_HELP_STRING([--disable-password-change], [disable password change support @<:@default=yes@:>@])],
+	,
+	[enable_password_change="yes"]
+)
+
 AC_ARG_VAR([MAX_CONFIGS], [specify the maximum number of configs @<:@default=50@:>@])
 if test -z "$MAX_CONFIGS"; then
 	MAX_CONFIGS=50
 fi
 AC_DEFINE_UNQUOTED([MAX_CONFIGS], [$MAX_CONFIGS], [Maximum number of config files supported.])
 
-AC_ARG_VAR([ARCH], [override the CPU architecture for the NSIS installer])
-test "x$ARCH" = "x" && ARCH=${host%%-*}
-
 case "$host" in
 	*-mingw*)
 		CPPFLAGS="${CPPFLAGS} -DWIN32_LEAN_AND_MEAN"
-		CPPFLAGS="${CPPFLAGS} -D_WIN32_WINNT=NTDDI_WINXP"
+		CPPFLAGS="${CPPFLAGS} -D_WIN32_WINNT=_WIN32_WINNT_VISTA -DWINVER=_WIN32_WINNT"
+		LDFLAGS="${LDFLAGS} -Wl,--nxcompat,--dynamicbase"
+
+		dnl older mingw doesn't support `--high-entropy-va`
+		_save_ldflags="$LDFLAGS"
+		LDFLAGS="-Wl,--high-entropy-va"
+		AC_LINK_IFELSE([AC_LANG_PROGRAM([])],[AS_VAR_SET(high_entropy_aslr,[yes])],)
+		LDFLAGS="$_save_ldflags"
+		AS_VAR_IF(high_entropy_aslr,[yes],[LDFLAGS="${LDFLAGS} -Wl,--high-entropy-va"],)
 		;;
 	*)
 		test "${enable_distonly}" = "no" && AC_MSG_ERROR([This project is supported for windows only.])
 		;;
 esac
 
-PKG_PROG_PKG_CONFIG
 AC_PROG_CPP
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 
-AC_ARG_VAR([MAKENSIS], [define the path to the makensis tool])
-if test "x$MAKENSIS" = "x"; then
-	AC_PATH_PROG([MAKENSIS], [makensis])
-fi
-AM_CONDITIONAL([HAVE_NSIS], [test "x$MAKENSIS" != "x"])
-
+if test "${enable_password_change}" = "yes"; then
+PKG_PROG_PKG_CONFIG
 PKG_CHECK_MODULES(
 	[OPENSSL_CRYPTO],
 	[libcrypto >= 0.9.6],
@@ -80,6 +89,9 @@ PKG_CHECK_MODULES(
 		[test "${enable_distonly}" = "no" && AC_MSG_ERROR([Cannot find OpenSSL library])]
 	)]
 )
+else
+	AC_DEFINE([DISABLE_CHANGE_PASSWORD],[1],[disable password change])
+fi
 
 test "${GCC}" = "yes" && CFLAGS="${CFLAGS} -pedantic -Wall -Wextra"
 

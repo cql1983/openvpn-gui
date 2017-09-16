@@ -23,6 +23,10 @@
 #include <config.h>
 #endif
 
+#if !defined (UNICODE)
+#error UNICODE and _UNICODE must be defined. This version only supports unicode builds.
+#endif
+
 #include <windows.h>
 #include <shlwapi.h>
 #include <wtsapi32.h>
@@ -44,6 +48,7 @@
 #include "localization.h"
 #include "manage.h"
 #include "misc.h"
+#include "save_pass.h"
 
 #ifndef DISABLE_CHANGE_PASSWORD
 #include <openssl/evp.h>
@@ -63,13 +68,16 @@ TCHAR szTitleText[ ] = _T("OpenVPN");
 /* Options structure */
 options_t o;
 
+/* Workaround for ASLR on Windows */
+__declspec(dllexport) char aslr_workaround;
+
 static int
 VerifyAutoConnections()
 {
     int i;
     BOOL match;
 
-    for (i = 0; o.auto_connect[i] != 0 && i < MAX_CONFIGS; i++)
+    for (i = 0; i < MAX_CONFIGS && o.auto_connect[i] != 0; i++)
     {
         int j;
         match = FALSE;
@@ -111,6 +119,9 @@ int WINAPI _tWinMain (HINSTANCE hThisInstance,
       { password, OnPassword },
       { proxy,    OnProxy },
       { stop,     OnStop },
+      { needok,   OnNeedOk },
+      { needstr,  OnNeedStr },
+      { echo,     OnEcho },
       { 0,        NULL }
   };
   InitManagement(handler);
@@ -120,7 +131,7 @@ int WINAPI _tWinMain (HINSTANCE hThisInstance,
 
 #ifdef DEBUG
   /* Open debug file for output */
-  if (!(o.debug_fp = fopen(DEBUG_FILE, "w")))
+  if (!(o.debug_fp = _wfopen(DEBUG_FILE, L"a+,ccs=UTF-8")))
     {
       /* can't open debug file */
       ShowLocalizedMsg(IDS_ERR_OPEN_DEBUG_FILE, DEBUG_FILE);
@@ -156,9 +167,6 @@ int WINAPI _tWinMain (HINSTANCE hThisInstance,
 #endif
 
 
-  /* Parse command-line options */
-  ProcessCommandLine(&o, GetCommandLine());
-
   /* Check if a previous instance is already running. */
   if ((FindWindow (szClassName, NULL)) != NULL)
     {
@@ -167,9 +175,12 @@ int WINAPI _tWinMain (HINSTANCE hThisInstance,
         exit(1);
     }
 
-  if (!GetRegistryKeys()) {
-    exit(1);
-  }
+  UpdateRegistry(); /* Checks version change and update keys/values */
+
+  GetRegistryKeys();
+  /* Parse command-line options */
+  ProcessCommandLine(&o, GetCommandLine());
+
   EnsureDirExists(o.config_dir);
 
   if (!CheckVersion()) {
@@ -182,8 +193,8 @@ int WINAPI _tWinMain (HINSTANCE hThisInstance,
     exit(1);
   }
 
-  if (!IsUserAdmin())
-    CheckIServiceStatus();
+  if (!IsUserAdmin() && strtod(o.ovpn_version, NULL) > 2.3 && !o.silent_connection)
+    CheckIServiceStatus(TRUE);
 
   BuildFileList();
   if (!VerifyAutoConnections()) {
@@ -297,18 +308,59 @@ ResumeConnections()
     }
 }
 
+/*
+ * Set scale factor of windows in pixels. Scale = 100% for dpi = 96
+ */
+static void
+dpi_setscale(UINT dpix)
+{
+    /* scale factor in percentage compared to the reference dpi of 96 */
+    if (dpix != 0)
+        o.dpi_scale = MulDiv(dpix, 100, 96);
+    else
+        o.dpi_scale = 100;
+    PrintDebug(L"DPI scale set to %u", o.dpi_scale);
+}
+
+/*
+ * Get dpi of the system and set the scale factor.
+ * The system dpi may be different from the per monitor dpi on
+ * Win 8.1 later. We set dpi awareness to system-dpi level in the
+ * manifest, and let Windows automatically re-scale windows
+ * if/when dpi changes dynamically.
+ */
+static void
+dpi_initialize(void)
+{
+    UINT dpix = 0;
+    HDC hdc = GetDC(NULL);
+
+    if (hdc)
+    {
+        dpix = GetDeviceCaps(hdc, LOGPIXELSX);
+        ReleaseDC(NULL, hdc);
+        PrintDebug(L"System DPI: dpix = %u", dpix);
+    }
+    else
+    {
+        PrintDebug(L"GetDC failed, using default dpi = 96 (error = %lu)", GetLastError());
+        dpix = 96;
+    }
+
+    dpi_setscale(dpix);
+}
 
 /*  This function is called by the Windows function DispatchMessage()  */
 LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
   static UINT s_uTaskbarRestart;
-  int i;
 
   switch (message) {
     case WM_CREATE:       
 
       /* Save Window Handle */
       o.hWnd = hwnd;
+      dpi_initialize();
 
       s_uTaskbarRestart = RegisterWindowMessage(TEXT("TaskbarCreated"));
 
@@ -323,7 +375,7 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
 
       CreatePopupMenus();	/* Create popup menus */  
       ShowTrayIcon();
-      if (o.allow_service[0]=='1' || o.service_only[0]=='1')
+      if (o.service_only)
         CheckServiceStatus();	// Check if service is running or not
       if (!AutoStartConnections()) {
         SendMessage(hwnd, WM_CLOSE, 0, 0);
@@ -350,6 +402,9 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
       }
       if ( (LOWORD(wParam) >= IDM_EDITMENU) && (LOWORD(wParam) < IDM_EDITMENU + MAX_CONFIGS) ) {
         EditConfig(LOWORD(wParam) - IDM_EDITMENU);
+      }
+      if ( (LOWORD(wParam) >= IDM_CLEARPASSMENU) && (LOWORD(wParam) < IDM_CLEARPASSMENU + MAX_CONFIGS) ) {
+        ResetSavePasswords(&o.conn[LOWORD(wParam) - IDM_CLEARPASSMENU]);
       }
 #ifndef DISABLE_CHANGE_PASSWORD
       if ( (LOWORD(wParam) >= IDM_PASSPHRASEMENU) && (LOWORD(wParam) < IDM_PASSPHRASEMENU + MAX_CONFIGS) ) {
@@ -406,31 +461,6 @@ LRESULT CALLBACK WindowProcedure (HWND hwnd, UINT message, WPARAM wParam, LPARAM
       }
       break;
 
-    case WM_POWERBROADCAST:
-      switch (wParam) {
-        case PBT_APMSUSPEND:
-          if (o.disconnect_on_suspend[0] == '1')
-            {
-              /* Suspend running connections */
-              for (i=0; i<o.num_configs; i++)
-                {
-                  if (o.conn[i].state == connected)
-                SuspendOpenVPN(i);
-                }
-
-              /* Wait for all connections to suspend */
-              for (i=0; i<10; i++, Sleep(500))
-                if (CountConnState(suspending) == 0) break;
-            }
-          return FALSE;
-
-        case PBT_APMRESUMESUSPEND:
-        case PBT_APMRESUMECRITICAL:
-          if (CountConnState(suspended) != 0 && !o.session_locked)
-            ResumeConnections();
-          return FALSE;
-      }
-
     default:			/* for messages that we don't deal with */
       if (message == s_uTaskbarRestart)
         {
@@ -462,11 +492,21 @@ AboutDialogFunc(UNUSED HWND hDlg, UINT msg, UNUSED WPARAM wParam, LPARAM lParam)
 static void
 ShowSettingsDialog()
 {
-  PROPSHEETPAGE psp[3];
+  PROPSHEETPAGE psp[4];
   int page_number = 0;
 
+  /* General tab */
+  psp[page_number].dwSize = sizeof(PROPSHEETPAGE);
+  psp[page_number].dwFlags = PSP_DLGINDIRECT;
+  psp[page_number].hInstance = o.hInstance;
+  psp[page_number].pResource = LocalizedDialogResource(ID_DLG_GENERAL);
+  psp[page_number].pfnDlgProc = GeneralSettingsDlgProc;
+  psp[page_number].lParam = 0;
+  psp[page_number].pfnCallback = NULL;
+  ++page_number;
+
   /* Proxy tab */
-  if (o.allow_proxy[0] == '1' && o.service_only[0] == '0') {
+  if (o.service_only == 0) {
     psp[page_number].dwSize = sizeof(PROPSHEETPAGE);
     psp[page_number].dwFlags = PSP_DLGINDIRECT;
     psp[page_number].hInstance = o.hInstance;
@@ -477,12 +517,12 @@ ShowSettingsDialog()
     ++page_number;
   }
 
-  /* General tab */
+  /* Advanced tab */
   psp[page_number].dwSize = sizeof(PROPSHEETPAGE);
   psp[page_number].dwFlags = PSP_DLGINDIRECT;
   psp[page_number].hInstance = o.hInstance;
-  psp[page_number].pResource = LocalizedDialogResource(ID_DLG_GENERAL);
-  psp[page_number].pfnDlgProc = LanguageSettingsDlgProc;
+  psp[page_number].pResource = LocalizedDialogResource(ID_DLG_ADVANCED);
+  psp[page_number].pfnDlgProc = AdvancedSettingsDlgProc;
   psp[page_number].lParam = 0;
   psp[page_number].pfnCallback = NULL;
   ++page_number;
@@ -539,7 +579,7 @@ void
 ImportConfigFile()
 {
     
-    TCHAR filter[37];
+    TCHAR filter[2*_countof(o.ext_string)+5];
 
     _sntprintf_0(filter, _T("*.%s%c*.%s%c"), o.ext_string, _T('\0'), o.ext_string, _T('\0'));
     

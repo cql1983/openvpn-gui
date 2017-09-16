@@ -32,28 +32,47 @@
 
 #include "options.h"
 #include "manage.h"
+#include "main.h"
 #include "misc.h"
+#include "main.h"
 
 /*
  * Helper function to do base64 conversion through CryptoAPI
+ * Returns TRUE on success, FALSE on error. Caller must free *output.
  */
-static void
+BOOL
 Base64Encode(const char *input, int input_len, char **output)
 {
     DWORD output_len;
+
+    if (input_len == 0)
+    {
+        /* set output to empty string  -- matches the behavior in openvpn */
+        *output = calloc (1, sizeof(char));
+        return TRUE;
+    }
     if (!CryptBinaryToStringA((const BYTE *) input, (DWORD) input_len,
         CRYPT_STRING_BASE64, NULL, &output_len) || output_len == 0)
     {
+#ifdef DEBUG
+        PrintDebug (L"Error in CryptBinaryToStringA: input = '%.*S'", input_len, input);
+#endif
         *output = NULL;
-        return;
+        return FALSE;
     }
     *output = (char *)malloc(output_len);
+    if (*output == NULL)
+        return FALSE;
+
     if (!CryptBinaryToStringA((const BYTE *) input, (DWORD) input_len,
         CRYPT_STRING_BASE64, *output, &output_len))
     {
+#ifdef DEBUG
+        PrintDebug (L"Error in CryptBinaryToStringA: input = '%.*S'", input_len, input);
+#endif
         free(*output);
         *output = NULL;
-        return;
+        return FALSE;
     }
     /* Trim trailing "\r\n" manually.
        Actually they can be stripped by adding CRYPT_STRING_NOCRLF to dwFlags,
@@ -61,6 +80,48 @@ Base64Encode(const char *input, int input_len, char **output)
     if(output_len > 1 && (*output)[output_len - 1] == '\x0A'
         && (*output)[output_len - 2] == '\x0D')
         (*output)[output_len - 2] = 0;
+
+    return TRUE;
+}
+/*
+ * Decode a nul-terminated base64 encoded input and save the result in
+ * an allocated buffer *output. The caller must free *output after use.
+ * The decoded output is nul-terminated so that the caller may treat
+ * it as a string when appropriate.
+ *
+ * Return the length of the decoded result (excluding nul) or -1 on
+ * error.
+ */
+int
+Base64Decode(const char *input, char **output)
+{
+    DWORD len;
+
+    PrintDebug (L"decoding %S", input);
+    if (!CryptStringToBinaryA(input, 0, CRYPT_STRING_BASE64_ANY,
+                              NULL, &len, NULL, NULL) || len == 0)
+    {
+        *output = NULL;
+        return -1;
+    }
+
+    *output = malloc(len + 1);
+    if (*output == NULL)
+        return -1;
+
+    if (!CryptStringToBinaryA(input, 0,
+        CRYPT_STRING_BASE64, (BYTE *) *output, &len, NULL, NULL))
+    {
+        free(*output);
+        *output = NULL;
+        return -1;
+    }
+
+    /* NUL terminate output */
+    (*output)[len] = '\0';
+    PrintDebug (L"Decoded output %S", *output);
+
+    return len;
 }
 
 /*
@@ -166,6 +227,9 @@ ManagementCommandFromInputBase64(connection_t *c, LPCSTR fmt, HWND hDlg,int id, 
     LPSTR input, input2, input_b64, input2_b64, cmd;
     int input_len, input2_len, cmd_len, pos;
 
+    input_b64 = NULL;
+    input2_b64 = NULL;
+
     GetDlgItemTextUtf8(hDlg, id, &input, &input_len);
     GetDlgItemTextUtf8(hDlg, id2, &input2, &input2_len);
 
@@ -199,10 +263,12 @@ ManagementCommandFromInputBase64(connection_t *c, LPCSTR fmt, HWND hDlg,int id, 
         }
     }
 
-    Base64Encode(input, input_len, &input_b64);
-    Base64Encode(input2, input2_len, &input2_b64);
+    if (!Base64Encode(input, input_len, &input_b64))
+        goto out;
+    if (!Base64Encode(input2, input2_len, &input2_b64))
+        goto out;
 
-    cmd_len = input_len * 2 + input2_len * 2 + strlen(fmt);
+    cmd_len = strlen(input_b64) + strlen(input2_b64) + strlen(fmt);
     cmd = malloc(cmd_len);
     if (cmd)
     {
@@ -210,11 +276,16 @@ ManagementCommandFromInputBase64(connection_t *c, LPCSTR fmt, HWND hDlg,int id, 
         retval = ManagementCommand(c, cmd, NULL, regular);
         free(cmd);
     }
-    free(input_b64);
-    free(input2_b64);
 
 out:
     /* Clear buffers with potentially secret content */
+    if (input_b64)
+        memset(input_b64, 0, strlen(input_b64));
+    if (input2_b64)
+        memset(input2_b64, 0, strlen(input2_b64));
+    free(input_b64);
+    free(input2_b64);
+
     if (input_len)
     {
         memset(input, 'x', input_len);
@@ -316,9 +387,69 @@ BOOL IsUserAdmin(VOID)
                                   &AdministratorsGroup);
     if(b)
     {
-        CheckTokenMembership(NULL, AdministratorsGroup, &b);
+        if (!CheckTokenMembership(NULL, AdministratorsGroup, &b))
+            b = FALSE;
         FreeSid(AdministratorsGroup);
     }
 
     return(b);
+}
+
+HANDLE
+InitSemaphore (void)
+{
+    HANDLE semaphore = NULL;
+    semaphore = CreateSemaphore (NULL, 1, 1, NULL);
+    if (!semaphore)
+    {
+        MessageBoxW (NULL, L"Error creating semaphore", TEXT(PACKAGE_NAME), MB_OK);
+#ifdef DEBUG
+        PrintDebug (L"InitSemaphore: CreateSemaphore failed [error = %lu]", GetLastError());
+#endif
+    }
+    return semaphore;
+}
+
+/* Check access rights on an existing file */
+BOOL
+CheckFileAccess (const TCHAR *path, int access)
+{
+    HANDLE h;
+    bool ret = FALSE;
+
+    h = CreateFile (path, access, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                   FILE_ATTRIBUTE_NORMAL, NULL);
+    if ( h != INVALID_HANDLE_VALUE )
+    {
+        ret = TRUE;
+        CloseHandle (h);
+    }
+
+    return ret;
+}
+
+/*
+ * Convert a NUL terminated utf8 string to widechar. The caller must free
+ * the returned pointer. Return NULL on error.
+ */
+WCHAR *
+Widen(const char *utf8)
+{
+    WCHAR *wstr = NULL;
+    if (!utf8)
+        return wstr;
+
+    int nch = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
+    if (nch > 0)
+        wstr = malloc(sizeof(WCHAR) * nch);
+    if (wstr)
+        nch =  MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wstr, nch);
+
+    if (nch == 0 && wstr)
+    {
+        free (wstr);
+        wstr = NULL;
+    }
+
+    return wstr;
 }

@@ -2,6 +2,7 @@
  *  OpenVPN-GUI -- A Windows GUI for OpenVPN.
  *
  *  Copyright (C) 2004 Mathias Sundman <mathias@nilings.se>
+ *                2016 Selva Nair <selva.nair@gmail.com>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -36,11 +37,42 @@
 
 extern options_t o;
 
-int
-GetRegistryKeys()
+struct regkey_str {
+    const WCHAR *name;
+    WCHAR *var;
+    int len;
+    const WCHAR *value;
+} regkey_str[] = {
+      {L"config_dir", o.config_dir, _countof(o.config_dir), L"%USERPROFILE%\\OpenVPN\\config"},
+      {L"config_ext", o.ext_string, _countof(o.ext_string), L"ovpn"},
+      {L"log_dir", o.log_dir, _countof(o.log_dir), L"%USERPROFILE%\\OpenVPN\\log"}
+    };
+
+struct regkey_int {
+    const WCHAR *name;
+    DWORD *var;
+    DWORD value;
+} regkey_int[] = {
+      {L"log_append", &o.log_append, 0},
+      {L"show_balloon", &o.show_balloon, 1},
+      {L"silent_connection", &o.silent_connection, 0},
+      {L"preconnectscript_timeout", &o.preconnectscript_timeout, 10},
+      {L"connectscript_timeout", &o.connectscript_timeout, 30},
+      {L"disconnectscript_timeout", &o.disconnectscript_timeout, 10},
+      {L"show_script_window", &o.show_script_window, 0},
+      {L"service_only", &o.service_only, 0}
+    };
+
+static int
+RegValueExists (HKEY regkey, const WCHAR *name)
+{
+    return (RegQueryValueEx (regkey, name, NULL, NULL, NULL, NULL) == ERROR_SUCCESS);
+}
+
+static int
+GetGlobalRegistryKeys()
 {
   TCHAR windows_dir[MAX_PATH];
-  TCHAR temp_path[MAX_PATH];
   TCHAR openvpn_path[MAX_PATH];
   TCHAR profile_dir[MAX_PATH];
   HKEY regkey;
@@ -58,7 +90,7 @@ GetRegistryKeys()
 
   /* Get path to OpenVPN installation. */
   if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, _T("SOFTWARE\\OpenVPN"), 0, KEY_READ, &regkey)
-      != ERROR_SUCCESS) 
+      != ERROR_SUCCESS)
     {
       /* registry key not found */
       ShowLocalizedMsg(IDS_ERR_OPEN_REGISTRY);
@@ -68,6 +100,7 @@ GetRegistryKeys()
     {
       /* error reading registry value */
       ShowLocalizedMsg(IDS_ERR_READING_REGISTRY);
+      RegCloseKey(regkey);
       return(false);
     }
   if (openvpn_path[_tcslen(openvpn_path) - 1] != _T('\\'))
@@ -80,175 +113,244 @@ GetRegistryKeys()
       _sntprintf_0(o.global_config_dir, _T("%sconfig"), openvpn_path);
     }
 
-  /* config_dir in user's profile by default */
-  _sntprintf_0(temp_path, _T("%s\\OpenVPN\\config"), profile_dir);
-  if (!GetRegKey(_T("config_dir"), o.config_dir, 
-      temp_path, _countof(o.config_dir))) return(false);
-
-  if (!GetRegKey(_T("config_ext"), o.ext_string, _T("ovpn"), _countof(o.ext_string))) return(false);
-
-  _sntprintf_0(temp_path, _T("%sbin\\openvpn.exe"), openvpn_path);
-  if (!GetRegKey(_T("exe_path"), o.exe_path, 
-      temp_path, _countof(o.exe_path))) return(false);
-
-  _sntprintf_0(temp_path, _T("%s\\OpenVPN\\log"), profile_dir);
-  if (!GetRegKey(_T("log_dir"), o.log_dir, 
-      temp_path, _countof(o.log_dir))) return(false);
-
-  if (!GetRegKey(_T("log_append"), o.append_string, _T("0"), _countof(o.append_string))) return(false);
-
-  if (!GetRegKey(_T("priority"), o.priority_string, 
-      _T("NORMAL_PRIORITY_CLASS"), _countof(o.priority_string))) return(false);
-
-  _sntprintf_0(temp_path, _T("%s\\system32\\notepad.exe"), windows_dir);
-  if (!GetRegKey(_T("log_viewer"), o.log_viewer, 
-      temp_path, _countof(o.log_viewer))) return(false);
-
-  _sntprintf_0(temp_path, _T("%s\\system32\\notepad.exe"), windows_dir);
-  if (!GetRegKey(_T("editor"), o.editor, 
-      temp_path, _countof(o.editor))) return(false);
-
-  if (!GetRegKey(_T("allow_edit"), o.allow_edit, _T("1"), _countof(o.allow_edit))) return(false);
-  
-  if (!GetRegKey(_T("allow_service"), o.allow_service, _T("0"), _countof(o.allow_service))) return(false);
-
-  if (!GetRegKey(_T("allow_password"), o.allow_password, _T("1"), _countof(o.allow_password))) return(false);
-
-  if (!GetRegKey(_T("allow_proxy"), o.allow_proxy, _T("1"), _countof(o.allow_proxy))) return(false);
-
-  if (!GetRegKey(_T("service_only"), o.service_only, _T("0"), _countof(o.service_only))) return(false);
-
-  if (!GetRegKey(_T("show_balloon"), o.show_balloon, _T("1"), _countof(o.show_balloon))) return(false);
-
-  if (!GetRegKey(_T("silent_connection"), o.silent_connection, _T("0"), _countof(o.silent_connection))) return(false);
-
-  if (!GetRegKey(_T("show_script_window"), o.show_script_window, _T("1"), _countof(o.show_script_window))) return(false);
-
-  if (!GetRegKey(_T("disconnect_on_suspend"), o.disconnect_on_suspend, _T("0"),
-      _countof(o.disconnect_on_suspend))) return(false);
-
-  if (!GetRegKey(_T("passphrase_attempts"), o.psw_attempts_string, _T("3"), 
-      _countof(o.psw_attempts_string))) return(false);
-  o.psw_attempts = _ttoi(o.psw_attempts_string);
-  if ((o.psw_attempts < 1) || (o.psw_attempts > 9))
+  if (!GetRegistryValue(regkey, _T("ovpn_admin_group"), o.ovpn_admin_group, _countof(o.ovpn_admin_group)))
     {
-      /* 0 <= passphrase_attempts <= 9 */
-      ShowLocalizedMsg(IDS_ERR_PASSPHRASE_ATTEMPTS);
-      return(false);
+      _tcsncpy(o.ovpn_admin_group, OVPN_ADMIN_GROUP, _countof(o.ovpn_admin_group)-1);
     }
 
-  if (!GetRegKey(_T("connectscript_timeout"), o.connectscript_timeout_string, _T("15"), 
-      _countof(o.connectscript_timeout_string))) return(false);
-  o.connectscript_timeout = _ttoi(o.connectscript_timeout_string);
-  if ((o.connectscript_timeout < 0) || (o.connectscript_timeout > 99))
+  if (!GetRegistryValue(regkey, _T("exe_path"), o.exe_path, _countof(o.exe_path)))
     {
-      /* 0 <= connectscript_timeout <= 99 */
-      ShowLocalizedMsg(IDS_ERR_CONN_SCRIPT_TIMEOUT);
-      return(false);
+      _sntprintf_0(o.exe_path, _T("%sbin\\openvpn.exe"), openvpn_path);
     }
 
-  if (!GetRegKey(_T("disconnectscript_timeout"), o.disconnectscript_timeout_string, _T("10"), 
-      _countof(o.disconnectscript_timeout_string))) return(false);
-  o.disconnectscript_timeout = _ttoi(o.disconnectscript_timeout_string);
-  if ((o.disconnectscript_timeout <= 0) || (o.disconnectscript_timeout > 99))
+  if (!GetRegistryValue(regkey, _T("priority"), o.priority_string, _countof(o.priority_string)))
     {
-      /* 0 < disconnectscript_timeout <= 99 */
-      ShowLocalizedMsg(IDS_ERR_DISCONN_SCRIPT_TIMEOUT);
-      return(false);
+      _tcsncpy(o.priority_string, _T("NORMAL_PRIORITY_CLASS"), _countof(o.priority_string)-1);
     }
-
-  if (!GetRegKey(_T("preconnectscript_timeout"), o.preconnectscript_timeout_string, _T("10"), 
-      _countof(o.preconnectscript_timeout_string))) return(false);
-  o.preconnectscript_timeout = _ttoi(o.preconnectscript_timeout_string);
-  if ((o.preconnectscript_timeout <= 0) || (o.preconnectscript_timeout > 99))
-    {
-      /* 0 < disconnectscript_timeout <= 99 */
-      ShowLocalizedMsg(IDS_ERR_PRECONN_SCRIPT_TIMEOUT);
-      return(false);
-    }
-
-  return(true);
+  if (!GetRegistryValueNumeric(regkey, _T("disable_save_passwords"), &o.disable_save_passwords))
+  {
+      o.disable_save_passwords = 0;
+  }
+  RegCloseKey(regkey);
+  return true;
 }
 
-
-int GetRegKey(const TCHAR name[], TCHAR *data, const TCHAR default_data[], DWORD len)
+int
+GetRegistryKeys ()
 {
-  LONG status;
-  DWORD type;
-  HKEY openvpn_key;
-  HKEY openvpn_key_write;
-  DWORD dwDispos;
-  TCHAR expanded_string[MAX_PATH];
-  DWORD size = len * sizeof(*data);
-  DWORD max_len = len - 1;
+    HKEY regkey;
+    DWORD status;
+    int i;
 
-  /* If option is already set via cmd-line, return */
-  if (data[0] != 0) 
+    if (!GetGlobalRegistryKeys())
+        return false;
+
+    status = RegOpenKeyEx(HKEY_CURRENT_USER, GUI_REGKEY_HKCU, 0, KEY_READ, &regkey);
+
+    for (i = 0 ; i < (int) _countof (regkey_str); ++i)
     {
-      // Expand environment variables inside the string.
-      ExpandEnvironmentStrings(data, expanded_string, _countof(expanded_string));
-      _tcsncpy(data, expanded_string, max_len);
-      return(true);
-    }
-
-  status = RegOpenKeyEx(HKEY_CURRENT_USER,
-                       _T("SOFTWARE\\OpenVPN-GUI"),
-                       0,
-                       KEY_READ,
-                       &openvpn_key);
-
-  if (status != ERROR_SUCCESS)
-    {
-      if (RegCreateKeyEx(HKEY_CURRENT_USER,
-                        _T("Software\\OpenVPN-GUI"),
-                        0,
-                        _T(""),
-                        REG_OPTION_NON_VOLATILE,
-                        KEY_READ | KEY_WRITE,
-                        NULL,
-                        &openvpn_key,
-                        &dwDispos) != ERROR_SUCCESS)
+        if ( status != ERROR_SUCCESS ||
+            !GetRegistryValue (regkey, regkey_str[i].name, regkey_str[i].var, regkey_str[i].len))
         {
-          /* error creating registry key */
-          ShowLocalizedMsg(IDS_ERR_CREATE_REG_HKCU_KEY, _T("OpenVPN-GUI"));
-          return(false);
-        }  
-    }
-
-
-  /* get a registry string */
-  status = RegQueryValueEx(openvpn_key, name, NULL, &type, (byte *) data, &size);
-  if (status != ERROR_SUCCESS || type != REG_SZ)
-    {
-      /* key did not exist - set default value */
-      status = RegOpenKeyEx(HKEY_CURRENT_USER,
-			  _T("SOFTWARE\\OpenVPN-GUI"),
-			  0,
-			  KEY_READ | KEY_WRITE,
-			  &openvpn_key_write);
-
-      if (status != ERROR_SUCCESS) {
-         /* can't open registry for writing */
-         ShowLocalizedMsg(IDS_ERR_WRITE_REGVALUE, _T("OpenVPN-GUI"), name);
-         return(false);
-      }    
-      if(!SetRegistryValue(openvpn_key_write, name, default_data))
-        {
-          /* cant read / set reg-key */ 
-          return(false);
+            /* no value found in registry, use the default */
+            wcsncpy (regkey_str[i].var, regkey_str[i].value, regkey_str[i].len);
+            regkey_str[i].var[regkey_str[i].len-1] = L'\0';
+            PrintDebug(L"default: %s = %s", regkey_str[i].name, regkey_str[i].var);
         }
-      _tcsncpy(data, default_data, max_len);
-      RegCloseKey(openvpn_key_write);
-
+        else
+            PrintDebug(L"from registry: %s = %s", regkey_str[i].name, regkey_str[i].var);
     }
 
-  RegCloseKey(openvpn_key);
+    for (i = 0 ; i < (int) _countof (regkey_int); ++i)
+    {
+        if ( status != ERROR_SUCCESS ||
+             !GetRegistryValueNumeric (regkey, regkey_int[i].name, regkey_int[i].var))
+        {
+            /* no value found in registry, use the default */
+            *regkey_int[i].var = regkey_int[i].value;
+            PrintDebug(L"default: %s = %lu", regkey_int[i].name, *regkey_int[i].var);
+        }
+        else
+            PrintDebug(L"from registry: %s = %lu", regkey_int[i].name, *regkey_int[i].var);
+    }
 
-  // Expand environment variables inside the string.
-  ExpandEnvironmentStrings(data, expanded_string, _countof(expanded_string));
-  _tcsncpy(data, expanded_string, max_len);
+    if ( status == ERROR_SUCCESS)
+        RegCloseKey (regkey);
 
-  return(true);
+    if ((o.disconnectscript_timeout == 0))
+    {
+        ShowLocalizedMsg(IDS_ERR_DISCONN_SCRIPT_TIMEOUT);
+        o.disconnectscript_timeout = 10;
+    }
+    if ((o.preconnectscript_timeout == 0))
+    {
+        ShowLocalizedMsg(IDS_ERR_PRECONN_SCRIPT_TIMEOUT);
+        o.preconnectscript_timeout = 10;
+    }
+
+    ExpandOptions ();
+    return true;
+}
+
+int
+SaveRegistryKeys ()
+{
+    HKEY regkey;
+    DWORD status;
+    int i;
+    int ret = false;
+
+    status = RegCreateKeyEx(HKEY_CURRENT_USER, GUI_REGKEY_HKCU, 0, NULL, REG_OPTION_NON_VOLATILE,
+                            KEY_WRITE|KEY_READ, NULL, &regkey, NULL);
+    if (status != ERROR_SUCCESS)
+    {
+        ShowLocalizedMsg (IDS_ERR_CREATE_REG_HKCU_KEY, GUI_REGKEY_HKCU);
+        goto out;
+    }
+    for (i = 0 ; i < (int) _countof (regkey_str); ++i)
+    {
+        /* save only if the value differs from default or already present in registry */
+        if ( CompareStringExpanded (regkey_str[i].var, regkey_str[i].value) != 0 ||
+             RegValueExists(regkey, regkey_str[i].name) )
+        {
+            if (!SetRegistryValue (regkey, regkey_str[i].name, regkey_str[i].var))
+                goto out;
+        }
+    }
+
+    for (i = 0 ; i < (int) _countof (regkey_int); ++i)
+    {
+        if ( *regkey_int[i].var != regkey_int[i].value ||
+             RegValueExists(regkey, regkey_int[i].name) )
+        {
+            if (!SetRegistryValueNumeric (regkey, regkey_int[i].name, *regkey_int[i].var))
+                goto out;
+        }
+    }
+    ret = true;
+
+out:
+
+    if (status == ERROR_SUCCESS)
+        RegCloseKey(regkey);
+    return ret;
+}
+
+static BOOL
+GetRegistryVersion (version_t *v)
+{
+    HKEY regkey;
+    CLEAR (*v);
+    DWORD len = sizeof(*v);
+
+    if (RegOpenKeyEx(HKEY_CURRENT_USER, GUI_REGKEY_HKCU, 0, KEY_READ, &regkey) == ERROR_SUCCESS)
+    {
+        if (RegGetValueW (regkey, NULL, L"version", RRF_RT_REG_BINARY, NULL, v, &len)
+              != ERROR_SUCCESS)
+            CLEAR (*v);
+        RegCloseKey(regkey);
+    }
+    return true;
+}
+
+static BOOL
+SetRegistryVersion (const version_t *v)
+{
+    HKEY regkey;
+    DWORD status;
+    BOOL ret = false;
+
+    status = RegCreateKeyEx(HKEY_CURRENT_USER, GUI_REGKEY_HKCU, 0, NULL, REG_OPTION_NON_VOLATILE,
+                            KEY_WRITE, NULL, &regkey, NULL);
+    if (status == ERROR_SUCCESS)
+    {
+        if (RegSetValueEx(regkey, L"version", 0, REG_BINARY, (const BYTE*) v, sizeof(*v)) == ERROR_SUCCESS)
+            ret = true;
+        RegCloseKey(regkey);
+    }
+    else
+       PrintDebug (L"Eror opening/creating 'HKCU\\%s' registry key", GUI_REGKEY_HKCU);
+    return ret;
+}
+
+static int
+MigrateNilingsKeys()
+{
+    DWORD status;
+    BOOL ret = false;
+    HKEY regkey, regkey_proxy, regkey_nilings;
+
+    status = RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Nilings\\OpenVPN-GUI", 0,
+                             KEY_READ, &regkey_nilings);
+    if (status != ERROR_SUCCESS)
+        return true; /* No old keys to migrate */
+
+    status = RegCreateKeyEx(HKEY_CURRENT_USER, GUI_REGKEY_HKCU, 0, NULL, REG_OPTION_NON_VOLATILE,
+                                    KEY_ALL_ACCESS, NULL, &regkey, NULL);
+    if (status != ERROR_SUCCESS)
+    {
+        ShowLocalizedMsg (IDS_ERR_CREATE_REG_HKCU_KEY, GUI_REGKEY_HKCU);
+        RegCloseKey (regkey_nilings);
+        return false;
+    }
+
+    /* For some reason this needs ALL_ACCESS for the CopyTree below to work */
+    status = RegCreateKeyEx(regkey, L"proxy", 0, NULL, REG_OPTION_NON_VOLATILE,
+                            KEY_ALL_ACCESS, NULL, &regkey_proxy, NULL);
+    if (status == ERROR_SUCCESS)
+    {
+        DWORD ui_lang;
+        /* Move language setting from Nilings to GUI_REGKEY_HKCU */
+        if (GetRegistryValueNumeric(regkey_nilings, L"ui_language", &ui_lang))
+            SetRegistryValueNumeric (regkey, L"ui_language", ui_lang);
+
+        status = RegCopyTree (regkey_nilings, NULL, regkey_proxy);
+        if (status == ERROR_SUCCESS)
+        {
+            RegDeleteValue (regkey_proxy, L"ui_language"); /* in case copied here */
+            ret = true;
+        }
+        RegCloseKey (regkey_proxy);
+    }
+    else
+        PrintDebug (L"Error creating key 'proxy' in HKCU\\%s", GUI_REGKEY_HKCU);
+
+    RegCloseKey (regkey);
+    RegCloseKey (regkey_nilings);
+
+    return ret;
+}
+
+int
+UpdateRegistry (void)
+{
+    version_t v;
+
+    GetRegistryVersion (&v);
+
+    if (memcmp(&v, &o.version, sizeof(v)) == 0)
+        return true;
+
+    switch (v.major)
+    {
+        case 0: /* Cleanup GUI_REGKEY_HKCU and migrate any values under Nilings */
+
+            RegDeleteTree (HKEY_CURRENT_USER, GUI_REGKEY_HKCU); /* delete all values and subkeys */
+
+            if (!MigrateNilingsKeys())
+                return false;
+        /* fall through to handle further updates */
+        case 11:
+            /* current version -- nothing to do */
+            break;
+        default:
+            break;
+    }
+
+    SetRegistryVersion (&o.version);
+    PrintDebug (L"Registry updated to version %hu.%hu", o.version.major, o.version.minor);
+
+    return true;
 }
 
 LONG GetRegistryValue(HKEY regkey, const TCHAR *name, TCHAR *data, DWORD len)
@@ -264,7 +366,10 @@ LONG GetRegistryValue(HKEY regkey, const TCHAR *name, TCHAR *data, DWORD len)
   if (status != ERROR_SUCCESS || type != REG_SZ)
     return(0);
 
-  return(data_len / sizeof(*data));
+  data_len /= sizeof(*data);
+  data[data_len - 1] = L'\0'; /* REG_SZ strings are not guaranteed to be null-terminated */
+
+  return(data_len);
 
 }
 
@@ -274,7 +379,7 @@ GetRegistryValueNumeric(HKEY regkey, const TCHAR *name, DWORD *data)
   DWORD type;
   DWORD size = sizeof(*data);
   LONG status = RegQueryValueEx(regkey, name, NULL, &type, (PBYTE) data, &size);
-  return (type == REG_DWORD ? status : ERROR_FILE_NOT_FOUND);
+  return (type == REG_DWORD && status == ERROR_SUCCESS) ? 1 : 0;
 }
 
 int SetRegistryValue(HKEY regkey, const TCHAR *name, const TCHAR *data)
@@ -289,7 +394,6 @@ int SetRegistryValue(HKEY regkey, const TCHAR *name, const TCHAR *data)
     }
 
   return(1);
-
 }
 
 int
@@ -301,4 +405,83 @@ SetRegistryValueNumeric(HKEY regkey, const TCHAR *name, DWORD data)
 
   ShowLocalizedMsg(IDS_ERR_WRITE_REGVALUE, GUI_REGKEY_HKCU, name);
   return 0;
+}
+
+/*
+ * Open HKCU\Software\OpenVPN-GUI\configs\config-name.
+ * The caller must close the key. Returns 1 on success.
+ */
+static int
+OpenConfigRegistryKey(const WCHAR *config_name, HKEY *regkey, BOOL create)
+{
+    DWORD status;
+    const WCHAR fmt[] = L"SOFTWARE\\OpenVPN-GUI\\configs\\%s";
+    int count = (wcslen(config_name) + wcslen(fmt) + 1);
+    WCHAR *name = malloc(count * sizeof(WCHAR));
+
+    if (!name)
+        return 0;
+
+    _snwprintf(name, count, fmt, config_name);
+    name[count-1] = L'\0';
+
+    if (!create)
+       status = RegOpenKeyEx (HKEY_CURRENT_USER, name, 0, KEY_READ | KEY_WRITE, regkey);
+    else
+    /* create if key doesn't exist */
+       status = RegCreateKeyEx(HKEY_CURRENT_USER, name, 0, NULL,
+               REG_OPTION_NON_VOLATILE, KEY_READ | KEY_WRITE, NULL, regkey, NULL);
+    free (name);
+
+    return (status == ERROR_SUCCESS);
+}
+
+int
+SetConfigRegistryValueBinary(const WCHAR *config_name, const WCHAR *name, const BYTE *data, DWORD len)
+{
+    HKEY regkey;
+    DWORD status;
+
+    if (!OpenConfigRegistryKey(config_name, &regkey, TRUE))
+        return 0;
+    status = RegSetValueEx(regkey, name, 0, REG_BINARY, data, len);
+    RegCloseKey(regkey);
+
+    return (status == ERROR_SUCCESS);
+}
+
+/*
+ * Read registry value into the user supplied buffer data that can hold
+ * up to len bytes. Returns the actual number of bytes read or zero on error.
+ * If data is NULL returns the required buffer size, and no data is read.
+ */
+DWORD
+GetConfigRegistryValue(const WCHAR *config_name, const WCHAR *name, BYTE *data, DWORD len)
+{
+    DWORD status;
+    DWORD type;
+    HKEY regkey;
+
+    if (!OpenConfigRegistryKey(config_name, &regkey, FALSE))
+        return 0;
+    status = RegQueryValueEx(regkey, name, NULL, &type, data, &len);
+    RegCloseKey(regkey);
+    if (status == ERROR_SUCCESS)
+        return len;
+    else
+        return 0;
+}
+
+int
+DeleteConfigRegistryValue(const WCHAR *config_name, const WCHAR *name)
+{
+    DWORD status;
+    HKEY regkey;
+
+    if (!OpenConfigRegistryKey(config_name, &regkey, FALSE))
+        return 0;
+    status = RegDeleteValue(regkey, name);
+    RegCloseKey(regkey);
+
+    return (status == ERROR_SUCCESS);
 }

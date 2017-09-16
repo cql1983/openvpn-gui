@@ -29,7 +29,8 @@ MAINTAINERCLEANFILES = \
 	$(srcdir)/config.h.in $(srcdir)/config.h.in~\
 	$(srcdir)/install-sh $(srcdir)/missing \
 	$(srcdir)/depcomp $(srcdir)/aclocal.m4 \
-	$(srcdir)/config.guess $(srcdir)/config.sub
+	$(srcdir)/config.guess $(srcdir)/config.sub \
+	$(srcdir)/compile
 
 bin_PROGRAMS = openvpn-gui
 
@@ -42,6 +43,7 @@ AM_CFLAGS = -municode
 
 openvpn_gui_RESOURCES = \
 	res/openvpn-gui-res.rc \
+	res/openvpn-gui-res-cs.rc \
 	res/openvpn-gui-res-de.rc \
 	res/openvpn-gui-res-dk.rc \
 	res/openvpn-gui-res-en.rc \
@@ -50,6 +52,7 @@ openvpn_gui_RESOURCES = \
 	res/openvpn-gui-res-fr.rc \
 	res/openvpn-gui-res-it.rc \
 	res/openvpn-gui-res-jp.rc \
+	res/openvpn-gui-res-kr.rc \
 	res/openvpn-gui-res-nl.rc \
 	res/openvpn-gui-res-no.rc \
 	res/openvpn-gui-res-pl.rc \
@@ -66,11 +69,7 @@ openvpn_gui_RESOURCES = \
 	res/reconnecting.ico \
 	res/openvpn-gui.manifest
 
-openvpn_gui_NSIS = \
-    nsis/openvpn-gui.nsi \
-    nsis/english.nsh
-
-EXTRA_DIST = $(openvpn_gui_RESOURCES) $(openvpn_gui_NSIS)
+EXTRA_DIST = $(openvpn_gui_RESOURCES)
 
 openvpn_gui_SOURCES = \
 	main.c main.h \
@@ -88,7 +87,9 @@ openvpn_gui_SOURCES = \
 	misc.c misc.h \
 	openvpn_config.c \
 	openvpn_config.h \
+	access.c access.h \
 	chartable.h \
+	save_pass.c save_pass.h \
 	openvpn-gui-res.h
 
 openvpn_gui_LDFLAGS = -mwindows
@@ -99,19 +100,11 @@ openvpn_gui_LDADD = \
 	-lcomctl32 \
 	-lwinhttp \
 	-lwtsapi32 \
-	-lcrypt32
+	-lcrypt32 \
+	-lnetapi32 \
+	-lole32 \
+	-lshlwapi \
+	-lsecur32
 
 openvpn-gui-res.o: $(openvpn_gui_RESOURCES) $(srcdir)/openvpn-gui-res.h
 	$(RCCOMPILE) -i $< -o $@
-
-if HAVE_NSIS
-CLEANFILES = openvpn-gui-installer.exe
-
-openvpn-gui-installer.exe: $(openvpn_gui_NSIS) $(bin_PROGRAMS)
-	$(STRIP) -s $(bin_PROGRAMS)
-	$(MAKENSIS) -DARCH=$(ARCH) -DVERSION=$(VERSION) $<
-
-installer: openvpn-gui-installer.exe
-
-.PHONY: installer
-endif

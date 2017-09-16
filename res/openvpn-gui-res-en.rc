@@ -21,21 +21,23 @@
  */
 
 /* Passphrase Dialog */
-ID_DLG_PASSPHRASE DIALOGEX 6, 18, 120, 51
+ID_DLG_PASSPHRASE DIALOGEX 6, 18, 160, 83
 STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
 EXSTYLE WS_EX_TOPMOST
-CAPTION "OpenVPN"
+CAPTION "OpenVPN - Private Key Password"
 FONT 8, "Microsoft Sans Serif"
 LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
 BEGIN
     LTEXT "Enter Password:", 201, 6, 6, 100, 10
     EDITTEXT ID_EDT_PASSPHRASE, 6, 17, 107, 12, ES_PASSWORD | ES_AUTOHSCROLL
-    PUSHBUTTON "OK", IDOK, 6, 33, 50, 14
-    PUSHBUTTON "Cancel", IDCANCEL, 64, 33, 50, 14
+    CHECKBOX "Save password", ID_CHK_SAVE_PASS, 6, 33, 100, 10
+    PUSHBUTTON "OK", IDOK, 20, 49, 50, 14
+    PUSHBUTTON "Cancel", IDCANCEL, 90, 49, 50, 14
+    LTEXT "", ID_TXT_WARNING, 6, 65, 100, 10
 END
 
 /* Auth Username/Password Dialog */
-ID_DLG_AUTH DIALOG 6, 18, 160, 62
+ID_DLG_AUTH DIALOG 6, 18, 160, 95
 STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
 CAPTION "OpenVPN - User Authentication"
 FONT 8, "Microsoft Sans Serif"
@@ -45,12 +47,14 @@ BEGIN
     LTEXT "Password:", 0, 6, 26, 50, 10
     EDITTEXT ID_EDT_AUTH_USER, 60, 6, 94, 12, ES_AUTOHSCROLL
     EDITTEXT ID_EDT_AUTH_PASS, 60, 23, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
-    PUSHBUTTON "OK", IDOK, 20, 42, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
-    PUSHBUTTON "Cancel", IDCANCEL, 90, 42, 52, 14
+    CHECKBOX "Save password", ID_CHK_SAVE_PASS, 6, 42, 100, 10
+    PUSHBUTTON "OK", IDOK, 20, 58, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
+    PUSHBUTTON "Cancel", IDCANCEL, 90, 58, 52, 14
+    LTEXT "", ID_TXT_WARNING, 6, 74, 150, 10
 END
 
 /* Auth Username/Password/Challenge Dialog */
-ID_DLG_AUTH_CHALLENGE DIALOG 6, 18, 160, 96
+ID_DLG_AUTH_CHALLENGE DIALOG 6, 18, 160, 129
 STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
 CAPTION "OpenVPN - User Authentication"
 FONT 8, "Microsoft Sans Serif"
@@ -63,8 +67,24 @@ BEGIN
     EDITTEXT ID_EDT_AUTH_PASS, 60, 23, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
     LTEXT "", ID_TXT_AUTH_CHALLENGE, 6, 43, 148, 10
     EDITTEXT ID_EDT_AUTH_CHALLENGE, 60, 57, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
-    PUSHBUTTON "OK", IDOK, 20, 76, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
-    PUSHBUTTON "Cancel", IDCANCEL, 90, 76, 52, 14
+    CHECKBOX "Save password", ID_CHK_SAVE_PASS, 6, 76, 100, 10
+    PUSHBUTTON "OK", IDOK, 20, 92, 50, 14, BS_PUSHBUTTON | WS_TABSTOP | WS_DISABLED
+    PUSHBUTTON "Cancel", IDCANCEL, 90, 92, 52, 14
+    LTEXT "", ID_TXT_WARNING, 6, 108, 150, 10
+END
+
+/* Challenge Response Dialog */
+ID_DLG_CHALLENGE_RESPONSE DIALOG 6, 18, 212, 72
+STYLE WS_SIZEBOX | WS_POPUP | WS_VISIBLE | WS_CAPTION | DS_CENTER | DS_SETFOREGROUND
+CAPTION "OpenVPN - Challenge Response"
+FONT 8, "Microsoft Sans Serif"
+LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
+BEGIN
+    LTEXT "", ID_TXT_DESCRIPTION, 6, 9, 208, 10
+    LTEXT "Response:", 0, 6, 30, 50, 10
+    EDITTEXT ID_EDT_RESPONSE, 60, 27, 94, 12, ES_PASSWORD | ES_AUTOHSCROLL
+    PUSHBUTTON "OK", IDOK, 20, 51, 50, 14, BS_PUSHBUTTON | WS_TABSTOP
+    PUSHBUTTON "Cancel", IDCANCEL, 90, 51, 52, 14
 END
 
 /* Status Dialog */
@@ -83,7 +103,7 @@ END
 /* Change Passphrase Dialog */
 ID_DLG_CHGPASS DIALOG 6, 18, 193, 82
 STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | DS_CENTER
-CAPTION "OpenVPN - Change Passphrase"
+CAPTION "OpenVPN - Change Private Key Passphrase"
 FONT 8, "Microsoft Sans Serif"
 LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
 BEGIN
@@ -130,6 +150,48 @@ BEGIN
     GROUPBOX "User Interface", 201, 6, 12, 235, 30
     LTEXT "Language:", ID_TXT_LANGUAGE, 17, 25, 52, 12
     COMBOBOX ID_CMB_LANGUAGE, 57, 23, 171, 400, CBS_DROPDOWNLIST | WS_TABSTOP
+
+    GROUPBOX "Startup", 202, 6, 47, 235, 30
+    AUTOCHECKBOX "Launch on Windows startup", ID_CHK_STARTUP, 17, 59, 100, 12
+
+    GROUPBOX "Preferences", 202, 6, 82, 235, 90
+    AUTOCHECKBOX "Append to log", ID_CHK_LOG_APPEND, 17, 95, 60, 10
+    AUTOCHECKBOX "Show script window", ID_CHK_SHOW_SCRIPT_WIN, 17, 110, 200, 10
+    AUTOCHECKBOX "Silent connection", ID_CHK_SILENT, 17, 125, 200, 10
+    LTEXT "Show Balloon", ID_TXT_BALLOON, 17, 140, 100, 10
+    AUTORADIOBUTTON "On connect", ID_RB_BALLOON1, 28, 155, 50, 10, WS_GROUP | WS_TABSTOP
+    AUTORADIOBUTTON "On connect/reconnect", ID_RB_BALLOON2, 86, 155, 90, 10
+    AUTORADIOBUTTON "Never", ID_RB_BALLOON0, 181, 155, 40, 10
+END
+
+/* Advanced Dialog */
+ID_DLG_ADVANCED DIALOGEX 6, 18, 252, 218
+STYLE WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU | DS_CENTER
+CAPTION "Advanced"
+FONT 8, "Microsoft Sans Serif"
+LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
+BEGIN
+    GROUPBOX "Configuration Files", 201, 6, 12, 235, 45
+    LTEXT "Folder:", ID_TXT_FOLDER, 17, 25, 32, 10
+    LTEXT "Extension:", ID_TXT_EXTENSION, 17, 40, 52, 10
+    EDITTEXT ID_EDT_CONFIG_DIR, 53, 23, 150, 12, ES_AUTOHSCROLL
+    EDITTEXT ID_EDT_CONFIG_EXT, 53, 38, 25, 12, ES_AUTOHSCROLL
+    PUSHBUTTON "…", ID_BTN_CONFIG_DIR, 208, 23, 25, 12
+
+    GROUPBOX "Log Files", 202, 6, 62, 235, 30
+    LTEXT "Folder:", ID_TXT_FOLDER, 17, 74, 32, 10
+    EDITTEXT ID_EDT_LOG_DIR, 53, 72, 150, 12, ES_AUTOHSCROLL
+    PUSHBUTTON "…", ID_BTN_LOG_DIR, 208, 72, 25, 12
+
+    GROUPBOX "Script Timeout", 201, 6, 97, 235, 60
+    LTEXT "Preconnect script timeout:", ID_TXT_PRECONNECT_TIMEOUT, 17, 110, 100, 10
+    LTEXT "Connect script timeout:", ID_TXT_CONNECT_TIMEOUT, 17, 125, 90, 10
+    LTEXT "Disconnect script timeout:", ID_TXT_DISCONNECT_TIMEOUT, 17, 140, 90, 10
+    EDITTEXT ID_EDT_PRECONNECT_TIMEOUT, 103, 108, 20, 12, ES_AUTOHSCROLL|ES_NUMBER
+    EDITTEXT ID_EDT_CONNECT_TIMEOUT, 103, 123, 20, 12, ES_AUTOHSCROLL|ES_NUMBER
+    EDITTEXT ID_EDT_DISCONNECT_TIMEOUT, 103, 138, 20, 12, ES_AUTOHSCROLL|ES_NUMBER
+
+    AUTOCHECKBOX "Service only", ID_CHK_SERVICE_ONLY, 6, 162, 100, 12
 END
 
 /* About Dialog */
@@ -140,16 +202,18 @@ FONT 8, "Microsoft Sans Serif"
 LANGUAGE LANG_ENGLISH, SUBLANG_DEFAULT
 BEGIN
     ICON ID_ICO_APP, 0, 8, 16, 21, 20
-    LTEXT "OpenVPN GUI v" PACKAGE_VERSION " - A Windows GUI for OpenVPN\n" \
+    LTEXT "OpenVPN GUI v" PACKAGE_VERSION_RESOURCE_STR " - A Windows GUI for OpenVPN\n" \
           "Copyright (C) 2004-2005 Mathias Sundman <info@openvpn.se>\n" \
-          "http://openvpn.se/", 0, 36, 15, 206, 26
+          "Copyright (C) 2008-2014 Heiko Hund <heikoh@users.sf.net>\n" \
+          "Copyright (C) 2012-2016 OpenVPN GUI contributors\n" \
+          "https://github.com/OpenVPN/openvpn-gui/", 0, 36, 15, 206, 42
     LTEXT "OpenVPN - An application to securely tunnel IP networks " \
-          "over a single UDP port, with support for SSL/TLS-based " \
+          "over a single TCP/UDP port, with support for SSL/TLS-based " \
           "session authentication and key exchange, packet " \
           "encryption, packet authentication, and packet compression.\n" \
           "\n" \
-          "Copyright (C) 2002-2005 OpenVPN Solutions LLC <info@openvpn.net>\n" \
-          "http://openvpn.net/", 0, 8, 45, 235, 56
+          "Copyright (C) 2002-2016 OpenVPN Technologies, Inc <info@openvpn.net>\n" \
+          "https://openvpn.net/", 0, 8, 61, 240, 64
 END
 
 /* Proxy Authentication Dialog */
@@ -187,6 +251,7 @@ BEGIN
     IDS_MENU_VIEWLOG "View Log"
     IDS_MENU_EDITCONFIG "Edit Config"
     IDS_MENU_PASSPHRASE "Change Password"
+    IDS_MENU_CLEARPASS  "Clear Saved Passwords"
     IDS_MENU_SERVICE_START "Start"
     IDS_MENU_SERVICE_STOP "Stop"
     IDS_MENU_SERVICE_RESTART "Restart"
@@ -201,7 +266,18 @@ BEGIN
 
     /* OpenVPN */
     IDS_ERR_MANY_CONFIGS "OpenVPN GUI does not support more than %d configs. Please contact the author if you have the need for more."
-    IDS_NFO_NO_CONFIGS "No readable connection profiles (config files) found"
+    IDS_NFO_NO_CONFIGS "No readable connection profiles (config files) found.\n"\
+                       "Use the ""Import File.."" menu or copy your config files to ""%s"" or ""%s""."
+    IDS_ERR_CONFIG_NOT_AUTHORIZED "Starting this connection (%s) requires membership in "\
+                                  """%s"" group. Contact your system administrator.\n"
+    IDS_ERR_CONFIG_TRY_AUTHORIZE  "Starting this connection (%s) requires membership in "\
+                                  """%s"" group.\n\n"\
+                                  "Do you want to add yourself to this group?\n"\
+                                  "This action may prompt for administrative password or consent."
+    IDS_NFO_CONFIG_AUTH_PENDING   "Starting this connection (%s) requires membership in "\
+                                  """%s"" group.\n\n"\
+                                  "Please complete the previous authorization dialog."
+    IDS_ERR_ADD_USER_TO_ADMIN_GROUP "Adding the user to ""%s"" group failed."
     IDS_ERR_ONE_CONN_OLD_VER "You can only have one connection running at the same time when using an older version on OpenVPN than 2.0-beta6."
     IDS_ERR_STOP_SERV_OLD_VER "You cannot use OpenVPN GUI to start a connection while the OpenVPN Service is running (with OpenVPN 1.5/1.6). Stop OpenVPN Service first if you want to use OpenVPN GUI."
     IDS_ERR_CREATE_EVENT "CreateEvent failed on exit event: %s"
@@ -245,7 +321,7 @@ BEGIN
     IDS_ERR_RUN_CONN_SCRIPT_TIMEOUT "Connect Script failed. TimeOut after %d sec."
     IDS_ERR_CONFIG_EXIST "There already exist a config file named '%s'. You cannot " \
                          "have multiple config files with the same name, even if " \
-                         "they reside in diffrent folders."
+                         "they reside in different folders."
     IDS_NFO_CONN_TIMEOUT "Connecting to management interface failed.\n" \
                          "View log file (%s) for more details."
     /* main - Resources */
@@ -282,7 +358,7 @@ BEGIN
                   "--allow_proxy\t\t: 1=Show Proxy Settings menu.\n" \
                   "--show_balloon\t\t: 0=Never, 1=At initial connect, 2=At every re-connect.\n" \
                   "--service_only\t\t: 1=Enable Service Only mode.\n" \
-                  "--silent_connection\t\t: 1=Do not show the status dialog while connecting.\n" \
+                  "--silent_connection\t\t: 1=Do not show the status dialog while connecting or non-critical warnings at startup.\n" \
                   "--show_script_window\t: 0=Hide Script execution window, 1=Show it.\n" \
                   "--passphrase_attempts\t: Number of passphrase attempts to allow.\n" \
                   "--connectscript_timeout\t: Time to wait for connect script to finish.\n" \
@@ -297,7 +373,7 @@ BEGIN
 
     /* passphrase - Resources */
     IDS_ERR_CREATE_PASS_THREAD "CreateThread to show ChangePassphrase dialog failed."
-    IDS_NFO_CHANGE_PWD "Change Password (%s)"
+    IDS_NFO_CHANGE_PWD "Change Private Key Password (%s)"
     IDS_ERR_PWD_DONT_MATCH "The passwords you typed do not match. Try again."
     IDS_ERR_PWD_TO_SHORT "Your new password must be at least %d characters long."
     IDS_NFO_EMPTY_PWD "Are you sure you want to set an EMPTY password?"
@@ -336,7 +412,6 @@ BEGIN
     IDS_ERR_GET_TEMP_PATH "Error determining TempPath with GetTempPath(). Using ""C:\\"" instead."
 
     /* service */
-    IDS_ERR_OPEN_SCMGR_ADMIN "OpenSCManager failed. You need Administrator rights to start a service."
     IDS_ERR_OPEN_VPN_SERVICE "Failed to open ""OpenVPNService"""
     IDS_ERR_START_SERVICE "Failed to start ""OpenVPNService"""
     IDS_ERR_QUERY_SERVICE "Failed to query service status."
@@ -373,4 +448,15 @@ BEGIN
     IDS_ERR_IMPORT_FAILED "Failed to import file. The following path could not be created.\n\n" \
                           "%s\n\nMake sure you have the right permissions."
     IDS_NFO_IMPORT_SUCCESS "File imported successfully."
+
+    /* save/delete password */
+    IDS_NFO_DELETE_PASS "Press OK to delete saved passwords for config ""%s"""
+
+    /* Token password related */
+    IDS_NFO_TOKEN_PASSWORD_CAPTION "OpenVPN - Token Password"
+    IDS_NFO_TOKEN_PASSWORD_REQUEST "Input Password/PIN for Token '%S'"
+
+    IDS_NFO_AUTH_PASS_RETRY "Wrong username or password. Try again..."
+    IDS_NFO_KEY_PASS_RETRY  "Wrong password. Try again..."
+
 END
